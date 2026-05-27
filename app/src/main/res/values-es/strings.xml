@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PaperLink</string>
+
+    <string name="home_search_hint">Ingresa el código (ej. H9W2)</string>
+    <string name="home_empty_state">No hay referencias recientes</string>
+    <string name="home_fab_content_description">Crear Nuevo Vínculo</string>
+
+    <string name="add_title">Nuevo Vínculo</string>
+    <string name="add_note_hint">Nota (opcional, máx 200 car.)</string>
+    <string name="add_generate_btn">Generar Código</string>
+    <string name="add_copy_btn">Copiar código</string>
+    <string name="add_copied_msg">Código copiado al portapapeles</string>
+    <string name="add_select_content_type">Selecciona el tipo de contenido</string>
+
+    <string name="detail_open_btn">Abrir Archivo</string>
+    <string name="detail_delete_btn">Eliminar Referencia</string>
+    <string name="detail_error_not_found">Este archivo ya no está disponible. ¿Deseas borrar la referencia?</string>
+</resources>

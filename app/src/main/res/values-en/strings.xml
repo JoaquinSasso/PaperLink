@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PaperLink</string>
+
+    <string name="home_search_hint">Enter code (e.g. H9W2)</string>
+    <string name="home_empty_state">No recent references</string>
+    <string name="home_fab_content_description">Create New Link</string>
+
+    <string name="add_title">New Link</string>
+    <string name="add_note_hint">Note (optional, max 200 chars)</string>
+    <string name="add_generate_btn">Generate Code</string>
+    <string name="add_copy_btn">Copy code</string>
+    <string name="add_copied_msg">Code copied to clipboard</string>
+    <string name="add_select_content_type">Select content type</string>
+
+    <string name="detail_open_btn">Open File</string>
+    <string name="detail_delete_btn">Delete Reference</string>
+    <string name="detail_error_not_found">This file is no longer available. Do you want to delete the reference?</string>
 </resources>
