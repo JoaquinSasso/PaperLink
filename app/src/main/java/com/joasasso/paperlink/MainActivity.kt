@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun PlaceholderScreen(modifier: Modifier = Modifier) {
     Text(
-        text = "PaperLink — Fase 1 OK",
+        text = "PaperLink — Fase 3 OK",
         modifier = modifier
     )
 }

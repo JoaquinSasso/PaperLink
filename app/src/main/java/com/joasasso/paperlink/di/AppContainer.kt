@@ -3,6 +3,7 @@ package com.joasasso.paperlink.di
 import android.content.Context
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.data.repository.PaperLinkRepository
+import com.joasasso.paperlink.domain.GenerateCodeUseCase
 
 /**
  * Contenedor de dependencias de la aplicación.
@@ -18,6 +19,7 @@ import com.joasasso.paperlink.data.repository.PaperLinkRepository
  */
 interface AppContainer {
     val paperLinkRepository: PaperLinkRepository
+    val generateCodeUseCase: GenerateCodeUseCase
 }
 
 /**
@@ -33,5 +35,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val paperLinkRepository: PaperLinkRepository by lazy {
         PaperLinkRepository(database.paperLinkDao())
+    }
+
+    override val generateCodeUseCase: GenerateCodeUseCase by lazy {
+        GenerateCodeUseCase(paperLinkRepository)
     }
 }
