@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema base solo para que el manifest no falle. El tema real de Material 3
+         se aplica desde Compose en Fase 4. -->
+    <style name="Theme.PaperLink" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
