@@ -35,5 +35,5 @@ data class PaperLink(
     @ColumnInfo(name = "display_name") val displayName: String? = null,
     val note: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
-    @ColumnInfo(name = "subject_id") val subjectId: Int? = null
+    @ColumnInfo(name = "subject_id") val subjectId: Long? = null
 )

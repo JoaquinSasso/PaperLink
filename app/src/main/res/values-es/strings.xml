@@ -4,7 +4,9 @@
 
     <string name="home_search_hint">Ingresa el código (ej. H9W2)</string>
     <string name="home_empty_state">No hay referencias recientes</string>
+    <string name="home_recent_title">Recientes</string>
     <string name="home_fab_content_description">Crear Nuevo Vínculo</string>
+    <string name="home_subjects_action">Materias</string>
 
     <string name="add_title">Nuevo Vínculo</string>
     <string name="add_note_hint">Nota (opcional, máx 200 car.)</string>
@@ -12,8 +14,24 @@
     <string name="add_copy_btn">Copiar código</string>
     <string name="add_copied_msg">Código copiado al portapapeles</string>
     <string name="add_select_content_type">Selecciona el tipo de contenido</string>
+    <string name="add_subject_label">Materia</string>
+    <string name="add_subject_none">Sin materia</string>
+    <string name="add_subject_create">Crear nueva materia</string>
 
     <string name="detail_open_btn">Abrir Archivo</string>
     <string name="detail_delete_btn">Eliminar Referencia</string>
     <string name="detail_error_not_found">Este archivo ya no está disponible. ¿Deseas borrar la referencia?</string>
+
+    <string name="subjects_title">Materias</string>
+    <string name="subjects_add">Agregar materia</string>
+    <string name="subjects_empty">Todavía no hay materias</string>
+    <string name="subjects_name_hint">Nombre de la materia</string>
+    <string name="subjects_color">Color</string>
+    <string name="subjects_save">Guardar</string>
+    <string name="subjects_cancel">Cancelar</string>
+    <string name="subjects_edit">Editar</string>
+    <string name="subjects_delete">Eliminar</string>
+
+    <string name="cd_back">Atrás</string>
+    <string name="cd_search">Buscar</string>
 </resources>

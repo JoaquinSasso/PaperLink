@@ -2,6 +2,7 @@ package com.joasasso.paperlink.data.repository
 
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.data.local.PaperLinkDao
+import com.joasasso.paperlink.data.local.Subject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -28,7 +29,7 @@ class PaperLinkRepository(
      * Inserta un nuevo PaperLink. Lanza excepción si el código ya existe
      * (por la estrategia ABORT del DAO).
      */
-    suspend fun insert(link: PaperLink) = withContext(Dispatchers.IO) {
+    suspend fun insert(link: PaperLink): Long = withContext(Dispatchers.IO) {
         dao.insert(link.copy(code = link.code.uppercase()))
     }
 
@@ -74,6 +75,37 @@ class PaperLinkRepository(
      */
     suspend fun count(): Int = withContext(Dispatchers.IO) {
         dao.count()
+    }
+
+    // ---- Materias (Subjects) ----
+
+    /**
+     * Inserta una nueva materia. Devuelve el ID generado o -1 si hubo error.
+     */
+    suspend fun insertSubject(subject: Subject): Long = withContext(Dispatchers.IO) {
+        dao.insertSubject(subject)
+    }
+
+    /**
+     * Actualiza una materia existente.
+     */
+    suspend fun updateSubject(subject: Subject): Unit = withContext(Dispatchers.IO) {
+        dao.updateSubject(subject)
+    }
+
+    /**
+     * Borra una materia. Room se encarga de poner a NULL los subject_id
+     * en paper_links si se configuró el OnDeleteAction.SET_NULL (Fase 6).
+     */
+    suspend fun deleteSubject(subject: Subject): Unit = withContext(Dispatchers.IO) {
+        dao.deleteSubject(subject)
+    }
+
+    /**
+     * Obtiene todas las materias en un flujo reactivo.
+     */
+    fun getAllSubjects(): Flow<List<Subject>> {
+        return dao.getAllSubjects()
     }
 
     companion object {

@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -21,7 +22,27 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface PaperLinkDao {
-    // ... [Mantener los métodos anteriores: insert, delete, getByCode, etc.]
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(link: PaperLink): Long
+
+    @Query("DELETE FROM paper_links WHERE code = :code")
+    suspend fun deleteByCode(code: String): Int
+
+    @Query("SELECT * FROM paper_links WHERE code = :code")
+    suspend fun getByCode(code: String): PaperLink?
+
+    @Query("SELECT * FROM paper_links WHERE code = :code")
+    fun observeByCode(code: String): Flow<PaperLink?>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM paper_links WHERE code = :code)")
+    suspend fun existsByCode(code: String): Boolean
+
+    @Query("SELECT * FROM paper_links ORDER BY created_at DESC LIMIT :limit")
+    fun getRecent(limit: Int): Flow<List<PaperLink>>
+
+    @Query("SELECT COUNT(*) FROM paper_links")
+    suspend fun count(): Int
 
     @Query("""
         SELECT * FROM paper_links 
@@ -31,7 +52,13 @@ interface PaperLinkDao {
     fun searchLinksFts(searchQuery: String): Flow<List<PaperLink>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSubject(subject: Subject)
+    suspend fun insertSubject(subject: Subject): Long
+
+    @Update
+    suspend fun updateSubject(subject: Subject)
+
+    @Delete
+    suspend fun deleteSubject(subject: Subject)
 
     @Query("SELECT * FROM subjects")
     fun getAllSubjects(): Flow<List<Subject>>

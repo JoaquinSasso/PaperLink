@@ -1,6 +1,7 @@
 
 package com.joasasso.paperlink.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Fts4
 
@@ -8,6 +9,6 @@ import androidx.room.Fts4
 @Fts4(contentEntity = PaperLink::class)
 data class PaperLinkFts(
     val code: String,
-    val displayName: String?,
+    @ColumnInfo(name = "display_name") val displayName: String?,
     val note: String?
 )

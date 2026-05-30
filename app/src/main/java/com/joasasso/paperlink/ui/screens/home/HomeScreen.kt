@@ -6,7 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,19 +25,36 @@ import com.joasasso.paperlink.ui.theme.JetBrainsMono
 
 /**
  * Pantalla Principal (HomeScreen).
- * Diseño Brutalmente Monofuncional: Campo de texto gigante centralizado para evitar dispersión cognitiva.
+ *
+ * NOTA: en esta entrega (Organización Parte 1) solo se agregó la TopAppBar con
+ * acceso a la gestión de materias. El cuerpo (campo de código + recientes) queda
+ * igual; el toggle Código | Buscar y los chips de filtro llegan en la Parte 2.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToAdd: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
+    onNavigateToSubjects: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val recentLinks by viewModel.recentLinks.collectAsState()
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                actions = {
+                    IconButton(onClick = onNavigateToSubjects) {
+                        Icon(
+                            imageVector = Icons.Default.Category,
+                            contentDescription = stringResource(R.string.home_subjects_action)
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onNavigateToAdd,
@@ -59,7 +77,6 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.weight(0.3f))
 
-            // Campo de búsqueda central gigante
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
@@ -73,7 +90,10 @@ fun HomeScreen(
                 trailingIcon = {
                     if (uiState.isQueryValid) {
                         IconButton(onClick = { onNavigateToDetail(uiState.searchQuery) }) {
-                            Icon(Icons.Default.ArrowForward, contentDescription = "Buscar")
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = stringResource(R.string.cd_search)
+                            )
                         }
                     }
                 },
@@ -82,9 +102,8 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.weight(0.2f))
 
-            // Lista de referencias recientes (Feedback inmediato al usuario)
             Text(
-                text = "Recientes",
+                text = stringResource(R.string.home_recent_title),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -94,7 +113,9 @@ fun HomeScreen(
 
             if (recentLinks.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -105,7 +126,9 @@ fun HomeScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(recentLinks) { link ->

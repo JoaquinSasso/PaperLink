@@ -9,17 +9,15 @@ import androidx.navigation.toRoute
 import com.joasasso.paperlink.ui.screens.add.AddLinkScreen
 import com.joasasso.paperlink.ui.screens.detail.DetailScreen
 import com.joasasso.paperlink.ui.screens.home.HomeScreen
+import com.joasasso.paperlink.ui.screens.subjects.SubjectsScreen
 import kotlinx.serialization.Serializable
 
-// Definición de rutas seguras tipo-fuertes (Type-Safe Navigation)
+// Rutas tipadas (Type-Safe Navigation)
 @Serializable object HomeDestination
 @Serializable object AddLinkDestination
+@Serializable object SubjectsDestination
 @Serializable data class DetailDestination(val code: String)
 
-/**
- * Grafo de navegación central de PaperLink.
- * Conecta HomeScreen, AddLinkScreen y DetailScreen sin strings duros en las rutas.
- */
 @Composable
 fun PaperLinkNavNavHost(
     navController: NavHostController,
@@ -30,20 +28,18 @@ fun PaperLinkNavNavHost(
         startDestination = HomeDestination,
         modifier = modifier
     ) {
-        // Pantalla Principal: Búsqueda y Recientes
         composable<HomeDestination> {
             HomeScreen(
                 onNavigateToAdd = { navController.navigate(AddLinkDestination) },
-                onNavigateToDetail = { code -> navController.navigate(DetailDestination(code)) }
+                onNavigateToDetail = { code -> navController.navigate(DetailDestination(code)) },
+                onNavigateToSubjects = { navController.navigate(SubjectsDestination) }
             )
         }
 
-        // Pantalla de Creación: Selección de Multimedia y Generación de Código
         composable<AddLinkDestination> {
             AddLinkScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToDetail = { code ->
-                    // Hacemos pop y vamos al detalle para que el flujo de retorno no vuelva al formulario
                     navController.navigate(DetailDestination(code)) {
                         popUpTo(HomeDestination) { inclusive = false }
                     }
@@ -51,7 +47,12 @@ fun PaperLinkNavNavHost(
             )
         }
 
-        // Pantalla de Detalle: Visualización, Redirección y Borrado
+        composable<SubjectsDestination> {
+            SubjectsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         composable<DetailDestination> { backStackEntry ->
             val destination: DetailDestination = backStackEntry.toRoute()
             DetailScreen(
