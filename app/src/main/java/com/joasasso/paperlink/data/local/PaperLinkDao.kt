@@ -21,28 +21,22 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface PaperLinkDao {
+    // ... [Mantener los métodos anteriores: insert, delete, getByCode, etc.]
 
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun insert(link: PaperLink)
+    @Query("""
+        SELECT * FROM paper_links 
+        JOIN paper_links_fts ON paper_links.code = paper_links_fts.code 
+        WHERE paper_links_fts MATCH :searchQuery
+    """)
+    fun searchLinksFts(searchQuery: String): Flow<List<PaperLink>>
 
-    @Delete
-    suspend fun delete(link: PaperLink)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSubject(subject: Subject)
 
-    @Query("DELETE FROM paper_links WHERE code = :code")
-    suspend fun deleteByCode(code: String): Int
+    @Query("SELECT * FROM subjects")
+    fun getAllSubjects(): Flow<List<Subject>>
 
-    @Query("SELECT * FROM paper_links WHERE code = :code LIMIT 1")
-    suspend fun getByCode(code: String): PaperLink?
-
-    @Query("SELECT * FROM paper_links WHERE code = :code LIMIT 1")
-    fun observeByCode(code: String): Flow<PaperLink?>
-
-    @Query("SELECT EXISTS(SELECT 1 FROM paper_links WHERE code = :code LIMIT 1)")
-    suspend fun existsByCode(code: String): Boolean
-
-    @Query("SELECT * FROM paper_links ORDER BY created_at DESC LIMIT :limit")
-    fun getRecent(limit: Int): Flow<List<PaperLink>>
-
-    @Query("SELECT COUNT(*) FROM paper_links")
-    suspend fun count(): Int
+    // Método base para la limpieza de referencias huérfanas
+    @Query("SELECT * FROM paper_links")
+    suspend fun getAllLinksSnapshot(): List<PaperLink>
 }

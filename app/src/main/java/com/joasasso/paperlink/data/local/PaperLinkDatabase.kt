@@ -18,8 +18,8 @@ import androidx.room.TypeConverters
  * en el repositorio cuando lleguen.
  */
 @Database(
-    entities = [PaperLink::class],
-    version = 1,
+    entities = [PaperLink::class, Subject::class, PaperLinkFts::class],
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(ContentTypeConverter::class)
@@ -28,18 +28,19 @@ abstract class PaperLinkDatabase : RoomDatabase() {
     abstract fun paperLinkDao(): PaperLinkDao
 
     companion object {
-        private const val DATABASE_NAME = "paperlink.db"
-
-        /**
-         * Construye la instancia única de la base. Se llama desde [AppContainer].
-         * No usa singleton estático: la unicidad la garantiza el container.
-         */
+        @Volatile
+        private var INSTANCE: PaperLinkDatabase? = null
         fun build(context: Context): PaperLinkDatabase {
-            return Room.databaseBuilder(
-                context.applicationContext,
-                PaperLinkDatabase::class.java,
-                DATABASE_NAME
-            ).build()
+            return INSTANCE ?: synchronized(this) {
+                Room.databaseBuilder(
+                    context,
+                    PaperLinkDatabase::class.java,
+                    "paperlink.db"
+                )
+                    .fallbackToDestructiveMigration() // Limpia la BD local en el dispositivo al detectar el cambio de versión
+                    .build()
+                    .also { INSTANCE = it }
+            }
         }
     }
 }

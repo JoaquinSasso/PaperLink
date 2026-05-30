@@ -29,25 +29,11 @@ import androidx.room.PrimaryKey
  */
 @Entity(tableName = "paper_links")
 data class PaperLink(
-    @PrimaryKey
-    @ColumnInfo(name = "code")
-    val code: String,
-
-    @ColumnInfo(name = "content_type")
-    val contentType: ContentType,
-
-    @ColumnInfo(name = "content_uri")
-    val contentUri: String,
-
-    @ColumnInfo(name = "display_name")
-    val displayName: String? = null,
-
-    @ColumnInfo(name = "note")
+    @PrimaryKey val code: String,
+    @ColumnInfo(name = "content_type") val contentType: ContentType,
+    @ColumnInfo(name = "content_uri") val contentUri: String,
+    @ColumnInfo(name = "display_name") val displayName: String? = null,
     val note: String? = null,
-
-    @ColumnInfo(name = "created_at")
-    val createdAt: Long,
-
-    @ColumnInfo(name = "subject")
-    val subject: String? = null
+    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "subject_id") val subjectId: Int? = null
 )
