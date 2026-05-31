@@ -17,12 +17,13 @@ import androidx.room.TypeConverter
  *   schema contra reordenamientos o inserciones de valores nuevos en el enum.
  */
 enum class ContentType {
-    IMAGE,
-    VIDEO,
-    AUDIO,
-    PDF,
-    WEB_LINK,
-    FILE;
+    IMAGE,      // Fotografías capturadas o de la galería (jpg, png)
+    VIDEO,      // Archivos de video (mp4, mkv)
+    AUDIO,      // Archivos de sonido o grabaciones de clases (mp3, m4a, wav)
+    PDF,        // Documentos de texto portátiles (.pdf)
+    WEB_LINK,   // Enlaces a internet (https://...)
+    FILE,       // Tipo genérico para archivos no catalogados (zip, docx, etc.)
+    TEXT_NOTE;   // Apuntes de texto largos escritos nativamente dentro de la app
 
     companion object {
         /**

@@ -4,7 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.joasasso.paperlink.R
+import com.joasasso.paperlink.ui.components.ThumbnailImage
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 
 /**
@@ -35,13 +37,44 @@ fun DetailScreen(
         viewModel.loadLink(code)
     }
 
+    if (uiState.showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.showDeleteConfirmation(false) },
+            title = { Text("¿Eliminar código?") },
+            text = { Text("Se borrará el código $code y su referencia digital de forma permanente.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteLink()
+                        onNavigateBack()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.showDeleteConfirmation(false) }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(text = "Código: $code", fontFamily = JetBrainsMono) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                    }
+                },
+                actions = {
+                    if (uiState.link != null) {
+                        IconButton(onClick = { viewModel.showDeleteConfirmation(true) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             )
@@ -78,11 +111,21 @@ fun DetailScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    ThumbnailImage(
+                        uri = link.contentUri,
+                        type = link.contentType,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Text(
                         text = link.code,
-                        style = MaterialTheme.typography.displayLarge,
+                        style = MaterialTheme.typography.displayMedium.copy(fontFamily = JetBrainsMono),
                         color = MaterialTheme.colorScheme.primary
                     )
 

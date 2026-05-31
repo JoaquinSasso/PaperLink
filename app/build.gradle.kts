@@ -90,8 +90,9 @@ dependencies {
     // DataStore (preparado para configuración futura)
     implementation(libs.androidx.datastore.preferences)
 
-    // Coil 3 para imágenes
+    // Coil 3 para imágenes y video
     implementation(libs.coil.compose)
+    implementation(libs.coil.video)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

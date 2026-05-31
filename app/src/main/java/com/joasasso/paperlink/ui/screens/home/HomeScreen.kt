@@ -1,6 +1,7 @@
 package com.joasasso.paperlink.ui.screens.home
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.PaperLink
+import com.joasasso.paperlink.ui.components.ThumbnailImage
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 
 /**
@@ -40,6 +42,27 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val recentLinks by viewModel.recentLinks.collectAsState()
+
+    if (uiState.linkToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.confirmDelete(null) },
+            title = { Text("¿Eliminar código?") },
+            text = { Text("Se borrará el código ${uiState.linkToDelete?.code} y su referencia digital de forma permanente.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteLink() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.confirmDelete(null) }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -132,7 +155,11 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(recentLinks) { link ->
-                        RecentLinkItem(link = link, onClick = { onNavigateToDetail(link.code) })
+                        RecentLinkItem(
+                            link = link,
+                            onClick = { onNavigateToDetail(link.code) },
+                            onLongClick = { viewModel.confirmDelete(link) }
+                        )
                     }
                 }
             }
@@ -140,31 +167,49 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RecentLinkItem(link: PaperLink, onClick: () -> Unit) {
+fun RecentLinkItem(
+    link: PaperLink,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = link.code,
-                style = MaterialTheme.typography.titleLarge.copy(fontFamily = JetBrainsMono),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.width(80.dp)
+            ThumbnailImage(
+                uri = link.contentUri,
+                type = link.contentType,
+                modifier = Modifier.size(48.dp)
             )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = link.displayName ?: link.contentType.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = link.code,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = JetBrainsMono),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = link.displayName ?: link.contentType.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
                 if (!link.note.isNullOrBlank()) {
                     Text(
                         text = link.note,
@@ -174,6 +219,13 @@ fun RecentLinkItem(link: PaperLink, onClick: () -> Unit) {
                     )
                 }
             }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

@@ -1,11 +1,13 @@
 package com.joasasso.paperlink.data.repository
 
+import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.data.local.PaperLinkDao
 import com.joasasso.paperlink.data.local.Subject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Capa de abstracción sobre [PaperLinkDao].
@@ -34,7 +36,25 @@ class PaperLinkRepository(
     }
 
     /**
+     * Borra un PaperLink por su objeto completo, encargándose de la limpieza
+     * de archivos físicos si es una nota nativa.
+     */
+    suspend fun delete(link: PaperLink, filesDir: File): Boolean = withContext(Dispatchers.IO) {
+        if (link.contentType == ContentType.TEXT_NOTE) {
+            try {
+                // El código es único, el archivo se llama nota_CODE.txt
+                val file = File(File(filesDir, "notes"), "nota_${link.code}.txt")
+                if (file.exists()) file.delete()
+            } catch (e: Exception) {
+                // Loguear error pero continuar con el borrado de DB para no dejar el link huérfano
+            }
+        }
+        dao.deleteByCode(link.code.uppercase()) > 0
+    }
+
+    /**
      * Borra un PaperLink por su código. Devuelve true si se borró algo.
+     * PRECAUCIÓN: No limpia archivos físicos de notas nativas.
      */
     suspend fun deleteByCode(code: String): Boolean = withContext(Dispatchers.IO) {
         dao.deleteByCode(code.uppercase()) > 0

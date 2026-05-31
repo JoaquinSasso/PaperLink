@@ -44,12 +44,15 @@ interface PaperLinkDao {
     @Query("SELECT COUNT(*) FROM paper_links")
     suspend fun count(): Int
 
+    /*
+    // TODO: Define PaperLinkFts entity to use this search method
     @Query("""
         SELECT * FROM paper_links 
         JOIN paper_links_fts ON paper_links.code = paper_links_fts.code 
         WHERE paper_links_fts MATCH :searchQuery
     """)
     fun searchLinksFts(searchQuery: String): Flow<List<PaperLink>>
+    */
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSubject(subject: Subject): Long

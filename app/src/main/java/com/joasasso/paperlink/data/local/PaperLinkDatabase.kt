@@ -18,13 +18,12 @@ import androidx.room.TypeConverters
  * en el repositorio cuando lleguen.
  */
 @Database(
-    entities = [PaperLink::class, Subject::class, PaperLinkFts::class],
-    version = 2,
+    entities = [PaperLink::class, Subject::class],
+    version = 1,
     exportSchema = true
 )
 @TypeConverters(ContentTypeConverter::class)
 abstract class PaperLinkDatabase : RoomDatabase() {
-
     abstract fun paperLinkDao(): PaperLinkDao
 
     companion object {

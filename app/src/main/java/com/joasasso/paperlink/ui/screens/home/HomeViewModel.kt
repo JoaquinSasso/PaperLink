@@ -1,5 +1,6 @@
 package com.joasasso.paperlink.ui.screens.home
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -10,11 +11,7 @@ import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.data.repository.PaperLinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
@@ -23,7 +20,8 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val searchQuery: String = "",
     val isQueryValid: Boolean = false,
-    val recentLinks: List<PaperLink> = emptyList()
+    val recentLinks: List<PaperLink> = emptyList(),
+    val linkToDelete: PaperLink? = null // Para el diálogo de confirmación
 )
 
 /**
@@ -31,7 +29,8 @@ data class HomeUiState(
  * Maneja el flujo continuo de elementos recientes y la validación del campo de búsqueda.
  */
 class HomeViewModel(
-    private val repository: PaperLinkRepository
+    private val repository: PaperLinkRepository,
+    private val application: Application
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -56,6 +55,18 @@ class HomeViewModel(
         }
     }
 
+    fun confirmDelete(link: PaperLink?) {
+        _uiState.update { it.copy(linkToDelete = link) }
+    }
+
+    fun deleteLink() {
+        val link = _uiState.value.linkToDelete ?: return
+        viewModelScope.launch {
+            repository.delete(link, application.filesDir)
+            _uiState.update { it.copy(linkToDelete = null) }
+        }
+    }
+
     /**
      * Factoría para inyectar manualmente el repositorio desde el AppContainer
      */
@@ -63,7 +74,7 @@ class HomeViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = (this[APPLICATION_KEY] as PaperLinkApp)
-                HomeViewModel(application.container.paperLinkRepository)
+                HomeViewModel(application.container.paperLinkRepository, application)
             }
         }
     }

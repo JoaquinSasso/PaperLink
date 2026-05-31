@@ -1,5 +1,6 @@
 package com.joasasso.paperlink.ui.screens.detail
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -17,11 +18,13 @@ import kotlinx.coroutines.launch
 data class DetailUiState(
     val link: PaperLink? = null,
     val isLoading: Boolean = true,
-    val isUriInvalid: Boolean = false
+    val isUriInvalid: Boolean = false,
+    val showDeleteConfirmation: Boolean = false
 )
 
 class DetailViewModel(
-    private val repository: PaperLinkRepository
+    private val repository: PaperLinkRepository,
+    private val application: Application
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -42,10 +45,14 @@ class DetailViewModel(
         _uiState.value = _uiState.value.copy(isUriInvalid = true)
     }
 
+    fun showDeleteConfirmation(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showDeleteConfirmation = show)
+    }
+
     fun deleteLink() {
         _uiState.value.link?.let {
             viewModelScope.launch {
-                repository.deleteByCode(it.code)
+                repository.delete(it, application.filesDir)
             }
         }
     }
@@ -54,7 +61,7 @@ class DetailViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = (this[APPLICATION_KEY] as PaperLinkApp)
-                DetailViewModel(application.container.paperLinkRepository)
+                DetailViewModel(application.container.paperLinkRepository, application)
             }
         }
     }

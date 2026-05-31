@@ -22,7 +22,7 @@ import com.joasasso.paperlink.ui.theme.parseSubjectColor
  */
 @Composable
 fun ColorPickerRow(
-    colors: List<String>,
+    colors: List<String>, // <-- CORREGIDO: Debe ser List<String>
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -32,6 +32,7 @@ fun ColorPickerRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         colors.forEach { hex ->
+            // Ahora hex es un String, por lo que equals(ignoreCase = true) funciona perfectamente
             val isSelected = hex.equals(selected, ignoreCase = true)
             Row(
                 modifier = Modifier
