@@ -2,7 +2,6 @@ package com.joasasso.paperlink.ui.screens.add
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -283,7 +282,10 @@ fun ContentTypeCard(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(1f) // Hacemos que sean cuadradas
+            .aspectRatio(1f), // Hacemos que sean cuadradas
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
     ) {
         Column(
             modifier = Modifier
@@ -298,7 +300,7 @@ fun ContentTypeCard(
                 modifier = Modifier
                     .size(48.dp)
                     .weight(1f),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -306,6 +308,7 @@ fun ContentTypeCard(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
                 maxLines = 1
             )
         }
