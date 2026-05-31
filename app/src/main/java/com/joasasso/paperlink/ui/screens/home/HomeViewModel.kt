@@ -63,6 +63,10 @@ class HomeViewModel(
         }
     }
 
+    fun findLinkByCode(code: String): PaperLink? {
+        return uiState.value.links.find { it.code.equals(code, ignoreCase = true) }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

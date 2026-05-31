@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -33,7 +32,7 @@ fun ThumbnailImage(
     modifier: Modifier = Modifier,
 ) {
     val icon = ContentTypeIcons.getIcon(type)
-    val showImage = (type == ContentType.IMAGE || type == ContentType.VIDEO)
+    val showImage = (type == ContentType.IMAGE || type == ContentType.VIDEO || type == ContentType.PDF)
     
     // Generación del Fingerprint Visual (Gradiente dinámico)
     val brush = remember(code) {
@@ -46,8 +45,7 @@ fun ThumbnailImage(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (showImage) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
-            .then(if (!showImage) Modifier.background(brush) else Modifier),
+            .background(brush), // El gradiente siempre está de fondo
         contentAlignment = Alignment.Center,
     ) {
         if (showImage && !uri.isNullOrBlank()) {
@@ -56,10 +54,13 @@ fun ThumbnailImage(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                error = rememberVectorPainter(icon)
+                // Si falla la carga (ej: PDF corrupto o imagen borrada), 
+                // dejamos que se vea el gradiente con el icono encima.
+                error = rememberVectorPainter(icon),
+                alpha = 1f
             )
         } else {
-            // Icono sutil sobre el gradiente para "Archivos Ciegos"
+            // Icono sutil sobre el gradiente para Notas y URLs
             Icon(
                 imageVector = icon,
                 contentDescription = null,

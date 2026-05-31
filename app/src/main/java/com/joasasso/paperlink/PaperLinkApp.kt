@@ -6,6 +6,7 @@ import coil3.SingletonImageLoader
 import coil3.video.VideoFrameDecoder
 import com.joasasso.paperlink.di.AppContainer
 import com.joasasso.paperlink.di.DefaultAppContainer
+import com.joasasso.paperlink.util.PdfDecoder
 
 /**
  * Application class de PaperLink.
@@ -33,6 +34,7 @@ class PaperLinkApp : Application(), SingletonImageLoader.Factory {
         return ImageLoader.Builder(context)
             .components {
                 add(VideoFrameDecoder.Factory())
+                add(PdfDecoder.Factory())
             }
             .build()
     }
