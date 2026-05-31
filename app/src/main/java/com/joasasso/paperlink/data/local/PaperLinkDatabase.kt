@@ -7,19 +7,12 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 /**
- * Base de datos local de PaperLink.
- *
- * Versionado:
- * - v1: schema inicial con una sola tabla `paper_links` y soporte para los seis
- *   tipos de contenido definidos en [ContentType].
- *
- * El schema se exporta a `app/schemas/` (configurado en build.gradle.kts vía
- * `ksp.arg("room.schemaLocation", ...)`). Esto permite versionar las migraciones
- * en el repositorio cuando lleguen.
+ * Base de datos radical de PaperLink.
+ * PIVOTE: Se elimina la tabla de Subjects para un diseño de Fricción Cero.
  */
 @Database(
-    entities = [PaperLink::class, Subject::class],
-    version = 1,
+    entities = [PaperLink::class],
+    version = 2, // Incrementamos para forzar la migración destructiva
     exportSchema = true
 )
 @TypeConverters(ContentTypeConverter::class)
@@ -36,7 +29,7 @@ abstract class PaperLinkDatabase : RoomDatabase() {
                     PaperLinkDatabase::class.java,
                     "paperlink.db"
                 )
-                    .fallbackToDestructiveMigration() // Limpia la BD local en el dispositivo al detectar el cambio de versión
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
             }

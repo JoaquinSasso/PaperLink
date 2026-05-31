@@ -15,43 +15,39 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
- * Estado de la UI para la pantalla principal.
+ * Estado Visual-First para el Home.
  */
 data class HomeUiState(
     val searchQuery: String = "",
     val isQueryValid: Boolean = false,
-    val recentLinks: List<PaperLink> = emptyList(),
-    val linkToDelete: PaperLink? = null // Para el diálogo de confirmación
+    val links: List<PaperLink> = emptyList(),
+    val linkToDelete: PaperLink? = null
 )
 
-/**
- * ViewModel encargado de la pantalla principal.
- * Maneja el flujo continuo de elementos recientes y la validación del campo de búsqueda.
- */
 class HomeViewModel(
     private val repository: PaperLinkRepository,
     private val application: Application
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-
-    // Observa reactivamente las últimas 10 referencias guardadas mediante un StateFlow caliente
-    val recentLinks: StateFlow<List<PaperLink>> = repository.getRecent(limit = 10)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val uiState: StateFlow<HomeUiState> = combine(
+        _uiState,
+        repository.getAllLinks()
+    ) { state, links ->
+        state.copy(links = links)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = HomeUiState()
+    )
 
     fun onSearchQueryChanged(newQuery: String) {
-        // Forzamos la normalización (Mayúsculas y sin espacios) al vuelo según las leyes de la app
         val normalized = CodeAlphabet.normalize(newQuery)
         if (normalized.length <= CodeAlphabet.CODE_LENGTH) {
-            _uiState.value = _uiState.value.copy(
+            _uiState.update { it.copy(
                 searchQuery = normalized,
                 isQueryValid = CodeAlphabet.isValid(normalized)
-            )
+            ) }
         }
     }
 
@@ -67,9 +63,6 @@ class HomeViewModel(
         }
     }
 
-    /**
-     * Factoría para inyectar manualmente el repositorio desde el AppContainer
-     */
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

@@ -5,18 +5,13 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
 import com.joasasso.paperlink.ui.screens.add.AddLinkScreen
-import com.joasasso.paperlink.ui.screens.detail.DetailScreen
 import com.joasasso.paperlink.ui.screens.home.HomeScreen
-import com.joasasso.paperlink.ui.screens.subjects.SubjectsScreen
 import kotlinx.serialization.Serializable
 
-// Rutas tipadas (Type-Safe Navigation)
+// Rutas tipadas simplificadas: El detalle muere, las materias mueren.
 @Serializable object HomeDestination
 @Serializable object AddLinkDestination
-@Serializable object SubjectsDestination
-@Serializable data class DetailDestination(val code: String)
 
 @Composable
 fun PaperLinkNavNavHost(
@@ -30,33 +25,12 @@ fun PaperLinkNavNavHost(
     ) {
         composable<HomeDestination> {
             HomeScreen(
-                onNavigateToAdd = { navController.navigate(AddLinkDestination) },
-                onNavigateToDetail = { code -> navController.navigate(DetailDestination(code)) },
-                onNavigateToSubjects = { navController.navigate(SubjectsDestination) }
+                onNavigateToAdd = { navController.navigate(AddLinkDestination) }
             )
         }
 
         composable<AddLinkDestination> {
             AddLinkScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToDetail = { code ->
-                    navController.navigate(DetailDestination(code)) {
-                        popUpTo(HomeDestination) { inclusive = false }
-                    }
-                }
-            )
-        }
-
-        composable<SubjectsDestination> {
-            SubjectsScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-
-        composable<DetailDestination> { backStackEntry ->
-            val destination: DetailDestination = backStackEntry.toRoute()
-            DetailScreen(
-                code = destination.code,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
