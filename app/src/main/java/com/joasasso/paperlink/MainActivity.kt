@@ -10,14 +10,14 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.joasasso.paperlink.ui.navigation.PaperLinkNavNavHost
 import com.joasasso.paperlink.ui.theme.PaperLinkTheme
-import com.joasasso.paperlink.worker.PhotoDetectionWorker
+import com.joasasso.paperlink.worker.PhotoScannerWorker
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Inicializar el Worker para la PoC
-        PhotoDetectionWorker.enqueue(this)
+        // Inicializar el PhotoScanner formal (si ya tiene permisos, lo manejará el Onboarding después)
+        PhotoScannerWorker.enqueue(this)
 
         setContent {
             PaperLinkTheme {

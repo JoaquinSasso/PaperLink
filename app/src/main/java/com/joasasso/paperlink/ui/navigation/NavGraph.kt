@@ -7,11 +7,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.joasasso.paperlink.ui.screens.add.AddLinkScreen
 import com.joasasso.paperlink.ui.screens.home.HomeScreen
+import com.joasasso.paperlink.ui.screens.onboarding.OnboardingScreen
 import kotlinx.serialization.Serializable
 
 // Rutas tipadas simplificadas: El detalle muere, las materias mueren.
 @Serializable object HomeDestination
 @Serializable object AddLinkDestination
+@Serializable object OnboardingDestination
 
 @Composable
 fun PaperLinkNavNavHost(
@@ -20,9 +22,19 @@ fun PaperLinkNavNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = HomeDestination,
+        startDestination = OnboardingDestination,
         modifier = modifier
     ) {
+        composable<OnboardingDestination> {
+            OnboardingScreen(
+                onComplete = {
+                    navController.navigate(HomeDestination) {
+                        popUpTo(OnboardingDestination) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable<HomeDestination> {
             HomeScreen(
                 onNavigateToAdd = { navController.navigate(AddLinkDestination) }
