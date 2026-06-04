@@ -1,6 +1,7 @@
 package com.joasasso.paperlink.ui.screens.home
 
 import android.content.Intent
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -51,24 +52,36 @@ fun HomeScreen(
 
     // Lógica robusta para abrir archivo
     val openFile: (String) -> Unit = { code ->
+        Log.d("PaperLinkDebug", "Intentando abrir código: $code")
         viewModel.findLinkByCode(code)?.let { link ->
-            val isTxt = link.contentUri.endsWith(".txt", ignoreCase = true) ||
-                    link.contentType == com.joasasso.paperlink.data.local.ContentType.TEXT_NOTE
+            val uri = link.contentUri.toUri()
+            val mimeType = context.contentResolver.getType(uri)
+            
+            val isTxtOrMd = link.contentUri.endsWith(".txt", ignoreCase = true) ||
+                    link.contentUri.endsWith(".md", ignoreCase = true) ||
+                    link.contentType == com.joasasso.paperlink.data.local.ContentType.TEXT_NOTE ||
+                    mimeType == "text/plain" ||
+                    mimeType == "text/markdown" ||
+                    mimeType == "application/octet-stream" && (link.contentUri.contains(".md") || link.contentUri.contains(".txt"))
 
-            if (isTxt) {
+            Log.d("PaperLinkDebug", "Link: ${link.code}, MimeType: $mimeType, IsTxtOrMd: $isTxtOrMd")
+
+            if (isTxtOrMd) {
+                Log.d("PaperLinkDebug", "Navegando a TxtViewer interno para: ${link.code}")
                 onNavigateToTxtViewer(link.contentUri, link.code)
             } else {
                 try {
+                    Log.d("PaperLinkDebug", "Lanzando Intent externo para: ${link.contentUri}")
                     val intent = Intent(Intent.ACTION_VIEW).apply {
-                        data = link.contentUri.toUri()
+                        data = uri
                         flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                     }
                     context.startActivity(intent)
-                } catch (_: Exception) {
-                    // Fallback silencioso
+                } catch (e: Exception) {
+                    Log.e("PaperLinkDebug", "Error al abrir intent externo: ${e.localizedMessage}")
                 }
             }
-        }
+        } ?: Log.w("PaperLinkDebug", "No se encontró ningún link con el código: $code")
     }
 
     // Disparador reactivo: En cuanto el código llega a 4, intentamos abrir
