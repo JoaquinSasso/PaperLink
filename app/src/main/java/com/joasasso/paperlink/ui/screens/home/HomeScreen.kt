@@ -43,6 +43,7 @@ import com.joasasso.paperlink.ui.components.ThumbnailImage
 @Composable
 fun HomeScreen(
     onNavigateToAdd: () -> Unit,
+    onNavigateToTxtViewer: (String, String) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -51,14 +52,21 @@ fun HomeScreen(
     // Lógica robusta para abrir archivo
     val openFile: (String) -> Unit = { code ->
         viewModel.findLinkByCode(code)?.let { link ->
-            try {
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = link.contentUri.toUri()
-                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            val isTxt = link.contentUri.endsWith(".txt", ignoreCase = true) ||
+                    link.contentType == com.joasasso.paperlink.data.local.ContentType.TEXT_NOTE
+
+            if (isTxt) {
+                onNavigateToTxtViewer(link.contentUri, link.code)
+            } else {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = link.contentUri.toUri()
+                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                } catch (_: Exception) {
+                    // Fallback silencioso
                 }
-                context.startActivity(intent)
-            } catch (_: Exception) {
-                // Fallback silencioso
             }
         }
     }
@@ -135,17 +143,7 @@ fun HomeScreen(
                 items(uiState.links) { link ->
                     VisualLinkCard(
                         link = link,
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    data = link.contentUri.toUri()
-                                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                context.startActivity(intent)
-                            } catch (_: Exception) {
-                                // Falla silenciosa
-                            }
-                        },
+                        onClick = { openFile(link.code) },
                         onLongClick = { viewModel.confirmDelete(link) },
                     )
                 }
