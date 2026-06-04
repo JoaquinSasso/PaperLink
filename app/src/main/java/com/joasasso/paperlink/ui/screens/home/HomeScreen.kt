@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.joasasso.paperlink.data.local.PaperLink
-import com.joasasso.paperlink.ui.components.ThumbnailImage
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
+import com.joasasso.paperlink.ui.components.ThumbnailImage
 
 /**
  * HomeScreen "Visual-First" de Fricción Cero.
@@ -92,13 +92,19 @@ fun HomeScreen(
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
+            LargeFloatingActionButton(
                 onClick = onNavigateToAdd,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir")
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Añadir",
+                    modifier = Modifier.size(36.dp)
+                )
             }
-        }
+        },
+        floatingActionButtonPosition = FabPosition.Center
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -175,7 +181,7 @@ fun CodeInputField(
         // Usamos un solo campo para evitar bugs de foco y lag del cursor nativo
         BasicTextField(
             value = value,
-            onValueChange = { 
+            onValueChange = {
                 if (it.length <= 4) onValueChange(it.uppercase().trim())
             },
             modifier = Modifier
@@ -218,9 +224,9 @@ fun CodeInputField(
                                     fontFamily = JetBrainsMono,
                                     fontSize = fontSize,
                                     fontWeight = FontWeight.Black,
-                                    color = if (isFilled) 
-                                        MaterialTheme.colorScheme.primary 
-                                    else 
+                                    color = if (isFilled)
+                                        MaterialTheme.colorScheme.primary
+                                    else
                                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                                 ),
                                 textAlign = TextAlign.Center
@@ -280,7 +286,7 @@ fun VisualLinkCard(
             code = link.code,
             modifier = Modifier.fillMaxSize()
         )
-        
+
         // El código gigante es el único texto permitido
         Surface(
             color = Color.Black.copy(alpha = 0.3f),

@@ -60,6 +60,7 @@ android {
 // Schemas de Room exportados para versionar migraciones a futuro
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.generateKotlin", "true")
 }
 
 dependencies {

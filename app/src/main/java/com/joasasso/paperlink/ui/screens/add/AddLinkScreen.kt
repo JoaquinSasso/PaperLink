@@ -8,14 +8,18 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,12 +34,17 @@ fun AddLinkScreen(
     viewModel: AddLinkViewModel = viewModel(factory = AddLinkViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     // SAF (Storage Access Framework)
     val safLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { viewModel.onLocalResourceSelected(it) }
+        uri?.let { 
+            viewModel.onLocalResourceSelected(it)
+            // Generación Instantánea al seleccionar archivo
+            viewModel.saveLink()
+        }
     }
 
     // Al generar el código, volvemos atrás (al Home)
@@ -122,7 +131,14 @@ fun AddLinkScreen(
                             onValueChange = { viewModel.onWebUrlEntered(it) },
                             label = { Text("URL (https://...)") },
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(ContentTypeIcons.getIcon(ContentType.WEB_LINK), null) }
+                            leadingIcon = { Icon(ContentTypeIcons.getIcon(ContentType.WEB_LINK), null) },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (uiState.contentUri.isNotBlank()) {
+                                    viewModel.saveLink()
+                                }
+                            }),
+                            singleLine = true
                         )
                     }
                     ContentType.TEXT_NOTE -> {
@@ -151,7 +167,8 @@ fun AddLinkScreen(
 
                 if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                } else {
+                } else if (uiState.selectedType == ContentType.TEXT_NOTE || uiState.selectedType == ContentType.WEB_LINK) {
+                    // El botón se muestra para Notas (manual) y URLs (confirmación adicional)
                     Button(
                         onClick = { viewModel.saveLink() },
                         enabled = if (uiState.selectedType == ContentType.TEXT_NOTE) {
