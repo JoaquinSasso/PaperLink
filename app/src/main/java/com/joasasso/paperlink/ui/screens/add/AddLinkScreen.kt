@@ -40,10 +40,13 @@ fun AddLinkScreen(
     val safLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { 
-            viewModel.onLocalResourceSelected(it)
+        if (uri != null) {
+            viewModel.onLocalResourceSelected(uri)
             // Generación Instantánea al seleccionar archivo
             viewModel.saveLink()
+        } else {
+            // Si el usuario cancela, reseteamos el tipo seleccionado para que no quede atrapado
+            viewModel.onTypeSelectionCancelled()
         }
     }
 
@@ -154,11 +157,33 @@ fun AddLinkScreen(
                     }
                     else -> {
                         Card(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = if (uiState.contentUri.isNotBlank()) "Archivo seleccionado" else "Ningún archivo",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(16.dp)
-                            )
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = if (uiState.contentUri.isNotBlank()) "Archivo seleccionado" else "Ningún archivo seleccionado",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                
+                                // Botón para reintentar la selección si por algún motivo quedó en esta pantalla
+                                OutlinedButton(
+                                    onClick = {
+                                        val mimeType = when (uiState.selectedType) {
+                                            ContentType.IMAGE -> "image/*"
+                                            ContentType.VIDEO -> "video/*"
+                                            ContentType.AUDIO -> "audio/*"
+                                            ContentType.PDF -> "application/pdf"
+                                            else -> "*/*"
+                                        }
+                                        safLauncher.launch(arrayOf(mimeType))
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Seleccionar archivo")
+                                }
+                            }
                         }
                     }
                 }

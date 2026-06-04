@@ -55,6 +55,10 @@ class AddLinkViewModel(
         }
     }
 
+    fun onTypeSelectionCancelled() {
+        _uiState.update { it.copy(selectedType = null) }
+    }
+
     fun onNativeNoteContentChanged(content: String) {
         if (content.length <= 5000) {
             _uiState.update { it.copy(nativeNoteContent = content) }
