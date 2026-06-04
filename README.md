@@ -5,7 +5,7 @@ Fase 2.1 â€” capa de datos refactorizada para soportar contenido multimedia genÃ
 ## Estado actual
 
 **Construido en Fase 1:**
-- Esqueleto Gradle (Kotlin 2.1.0, Compose Compiler plugin, KSP, Room, Navigation, Coil 3)
+- Esqueleto Gradle (Kotlin 2.4.0, Compose Compiler plugin, KSP, Room, Navigation, Coil 3)
 - `MainActivity` con placeholder de Compose
 - `PaperLinkApp` como Application class
 - minSdk 26 / targetSdk 35 / compileSdk 35
