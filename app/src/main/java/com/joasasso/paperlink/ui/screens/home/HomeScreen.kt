@@ -276,7 +276,7 @@ fun VisualLinkCard(
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(12.dp)) // Aseguramos que el overlay respete los bordes redondeados
+            .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -290,16 +290,23 @@ fun VisualLinkCard(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Overlay oscuro que ocupa toda la tarjeta para dar contraste al código
+        // Overlay oscuro total
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.Center
+                .background(Color.Black.copy(alpha = 0.3f))
+        )
+
+        // El código ahora se posiciona en la parte inferior para no tapar el centro visual
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            contentAlignment = Alignment.BottomCenter
         ) {
             Text(
                 text = link.code,
-                style = MaterialTheme.typography.displaySmall.copy(
+                style = MaterialTheme.typography.headlineLarge.copy(
                     fontFamily = JetBrainsMono,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp
