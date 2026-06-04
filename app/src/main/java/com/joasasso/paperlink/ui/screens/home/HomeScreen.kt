@@ -19,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
@@ -274,6 +276,7 @@ fun VisualLinkCard(
     Box(
         modifier = Modifier
             .aspectRatio(1f)
+            .clip(RoundedCornerShape(12.dp)) // Aseguramos que el overlay respete los bordes redondeados
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -287,11 +290,12 @@ fun VisualLinkCard(
             modifier = Modifier.fillMaxSize()
         )
 
-        // El código gigante es el único texto permitido
-        Surface(
-            color = Color.Black.copy(alpha = 0.3f),
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.padding(4.dp)
+        // Overlay oscuro que ocupa toda la tarjeta para dar contraste al código
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
         ) {
             Text(
                 text = link.code,
@@ -300,8 +304,7 @@ fun VisualLinkCard(
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp
                 ),
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                color = Color.White
             )
         }
     }

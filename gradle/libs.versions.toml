@@ -5,7 +5,7 @@ kotlin = "2.4.0"
 ksp = "2.3.9"
 
 # AndroidX core
-coreKtx = "1.18.0"
+coreKtx = "1.19.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.13.0"
 
@@ -66,6 +66,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 # Coil 3
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 import okio.buffer
 import okio.sink
 import java.io.File
+import androidx.core.graphics.createBitmap
 
 /**
  * Custom Decoder para Coil 3 que renderiza la primera página de un PDF.
@@ -44,7 +45,7 @@ class PdfDecoder(
             
             if (renderer.pageCount > 0) {
                 val page = renderer.openPage(0)
-                val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                val bitmap = createBitmap(page.width, page.height)
                 val canvas = Canvas(bitmap)
                 canvas.drawColor(android.graphics.Color.WHITE)
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
