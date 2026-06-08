@@ -1,30 +1,39 @@
 package com.joasasso.paperlink.ui.screens.home
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -32,10 +41,15 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
+import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
-import com.joasasso.paperlink.ui.theme.JetBrainsMono
 import com.joasasso.paperlink.ui.components.ThumbnailImage
+import com.joasasso.paperlink.ui.theme.JetBrainsMono
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * HomeScreen "Visual-First" de Fricción Cero.
@@ -49,6 +63,54 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Launcher para Cámara
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraUri != null) {
+            viewModel.processIncomingUri(tempCameraUri!!, ContentType.IMAGE)
+        }
+    }
+
+    // Launcher para Permisos
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val uri = viewModel.getTempCameraUri()
+            tempCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Escuchar eventos del ViewModel (LaunchCamera, Error)
+    LaunchedEffect(viewModel.events) {
+        viewModel.events.collectLatest { event ->
+            Log.d("PaperLinkDebug", "Event received in HomeScreen: $event")
+            when (event) {
+                is HomeEvent.LaunchCamera -> {
+                    val permissionCheck = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    )
+                    if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                        val uri = viewModel.getTempCameraUri()
+                        tempCameraUri = uri
+                        cameraLauncher.launch(uri)
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }
+                is HomeEvent.Error -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     // Lógica robusta para abrir archivo
     val openFile: (String) -> Unit = { code ->
@@ -115,16 +177,60 @@ fun HomeScreen(
 
     Scaffold(
         floatingActionButton = {
-            LargeFloatingActionButton(
-                onClick = onNavigateToAdd,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+            // Canal 1: Menú Flotante Inferior (Estilo Dock)
+            Surface(
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .height(64.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 8.dp,
+                shadowElevation = 12.dp
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Añadir",
-                    modifier = Modifier.size(36.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .fillMaxHeight(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Botón 1: Enlace / Archivo
+                    Button(
+                        onClick = onNavigateToAdd,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxHeight(0.8f)
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Enlace / Archivo")
+                    }
+
+                    VerticalDivider(
+                        modifier = Modifier
+                            .fillMaxHeight(0.5f)
+                            .width(1.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    // Botón 2: Tomar Foto
+                    Button(
+                        onClick = { viewModel.onTakePhotoClicked() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxHeight(0.8f)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tomar Foto")
+                    }
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.Center
@@ -135,6 +241,15 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp)
         ) {
+            // Canal 2: Banner Inteligente de Foto Reciente
+            if (uiState.recentPhotoUri != null) {
+                SmartPhotoBanner(
+                    uri = uiState.recentPhotoUri!!,
+                    onClick = { viewModel.processIncomingUri(it, ContentType.IMAGE) },
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            }
+
             // PIVOTE: Campo de código interactivo y grande
             CodeInputField(
                 value = uiState.searchQuery,
@@ -142,13 +257,17 @@ fun HomeScreen(
                 onEnter = { openFile(uiState.searchQuery) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 40.dp)
+                    .padding(vertical = 32.dp)
             )
+
+            if (uiState.isSaving) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
+            }
 
             // Grilla Visual-First
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(bottom = 80.dp),
+                contentPadding = PaddingValues(bottom = 100.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
@@ -191,7 +310,6 @@ fun CodeInputField(
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         // TextField invisible: CAPTURA TODA LA ENTRADA
-        // Usamos un solo campo para evitar bugs de foco y lag del cursor nativo
         BasicTextField(
             value = value,
             onValueChange = {
@@ -199,14 +317,14 @@ fun CodeInputField(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .alpha(0.01f), // Casi invisible pero recibe clicks y foco
+                .alpha(0.01f),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Characters,
                 autoCorrectEnabled = false,
                 imeAction = ImeAction.Done
             ),
             keyboardActions = KeyboardActions(onDone = { onEnter() }),
-            textStyle = TextStyle(fontSize = fontSize) // Para que el teclado sepa el tamaño
+            textStyle = TextStyle(fontSize = fontSize)
         )
 
         // Capa Visual: Renderizamos las cajas y el cursor manual
@@ -230,7 +348,6 @@ fun CodeInputField(
                             modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.Center
                         ) {
-                            // Texto o Placeholder (X)
                             Text(
                                 text = char?.toString() ?: "X",
                                 style = TextStyle(
@@ -245,19 +362,17 @@ fun CodeInputField(
                                 textAlign = TextAlign.Center
                             )
 
-                            // EL CURSOR FAKE: Siempre indica dónde irá el siguiente carácter
                             if (isNextSlot) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.Center)
                                         .width(3.dp)
-                                        .height(40.dp) // Altura visual para 48sp
+                                        .height(40.dp)
                                         .background(MaterialTheme.colorScheme.primary.copy(alpha = cursorAlpha))
                                 )
                             }
                         }
 
-                        // Subrayado dinámico
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -301,14 +416,12 @@ fun VisualLinkCard(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Overlay oscuro total
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.3f))
         )
 
-        // El código ahora se posiciona en la parte inferior para no tapar el centro visual
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -324,6 +437,48 @@ fun VisualLinkCard(
                 ),
                 color = Color.White
             )
+        }
+    }
+}
+
+@Composable
+fun SmartPhotoBanner(
+    uri: Uri,
+    onClick: (Uri) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick(uri) },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = MaterialTheme.shapes.large
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(MaterialTheme.shapes.medium),
+                contentScale = ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = "Foto reciente detectada",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    text = "Toca para generar código al instante",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
         }
     }
 }

@@ -1,6 +1,11 @@
 package com.joasasso.paperlink.ui.screens.home
 
 import android.app.Application
+import android.content.ContentUris
+import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -8,11 +13,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.joasasso.paperlink.PaperLinkApp
+import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.data.repository.PaperLinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
+import com.joasasso.paperlink.domain.GenerateCodeUseCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Estado Visual-First para el Home.
@@ -21,11 +31,19 @@ data class HomeUiState(
     val searchQuery: String = "",
     val isQueryValid: Boolean = false,
     val links: List<PaperLink> = emptyList(),
-    val linkToDelete: PaperLink? = null
+    val linkToDelete: PaperLink? = null,
+    val recentPhotoUri: Uri? = null,
+    val isSaving: Boolean = false
 )
+
+sealed class HomeEvent {
+    object LaunchCamera : HomeEvent()
+    data class Error(val message: String) : HomeEvent()
+}
 
 class HomeViewModel(
     private val repository: PaperLinkRepository,
+    private val generateCodeUseCase: GenerateCodeUseCase,
     private val application: Application
 ) : ViewModel() {
 
@@ -40,6 +58,146 @@ class HomeViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = HomeUiState()
     )
+
+    private val _events = MutableSharedFlow<HomeEvent>()
+    val events = _events.asSharedFlow()
+
+    init {
+        checkRecentPhoto()
+    }
+
+    /**
+     * Canal 2: Consulta el MediaStore para la foto más reciente (< 5 min).
+     */
+    fun checkRecentPhoto() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.d("HomeViewModel", "Checking for recent photos...")
+                val projection = arrayOf(
+                    MediaStore.Images.Media._ID,
+                    MediaStore.Images.Media.DATE_TAKEN,
+                    MediaStore.Images.Media.DATE_ADDED
+                )
+                val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+                val fiveMinutesAgoMs = System.currentTimeMillis() - (5 * 60 * 1000)
+
+                Log.d("HomeViewModel", "Querying MediaStore: current=${System.currentTimeMillis()}, threshold=$fiveMinutesAgoMs")
+
+                // Estrategia: Consultamos las más recientes añadidas (DATE_ADDED) que suele ser más fiable para "acaba de pasar"
+                application.contentResolver.query(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    projection,
+                    null,
+                    null,
+                    sortOrder
+                )?.use { cursor ->
+                    Log.d("HomeViewModel", "Query result count (Total): ${cursor.count}")
+                    
+                    if (cursor.moveToFirst()) {
+                        val dateAddedSec = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
+                        val dateTakenMs = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN))
+                        
+                        val nowSec = System.currentTimeMillis() / 1000
+                        val diffAddedSec = nowSec - dateAddedSec
+                        
+                        Log.d("HomeViewModel", "Top photo: Added=${dateAddedSec} (diff=${diffAddedSec}s), Taken=${dateTakenMs}")
+
+                        // Si se añadió hace menos de 5 minutos (300s)
+                        if (diffAddedSec < 300) {
+                            updateRecentPhoto(cursor)
+                        } else {
+                            Log.d("HomeViewModel", "Top photo is too old: ${diffAddedSec}s")
+                            _uiState.update { it.copy(recentPhotoUri = null) }
+                        }
+                    } else {
+                        Log.d("HomeViewModel", "No photos found at all")
+                        _uiState.update { it.copy(recentPhotoUri = null) }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error checking recent photo", e)
+            }
+        }
+    }
+
+    private fun updateRecentPhoto(cursor: android.database.Cursor) {
+        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        val id = cursor.getLong(idColumn)
+        val contentUri = ContentUris.withAppendedId(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            id
+        )
+        Log.d("HomeViewModel", "Found recent photo: $contentUri")
+        _uiState.update { it.copy(recentPhotoUri = contentUri) }
+    }
+
+    /**
+     * Procesa una URI entrante (Share Intent o Banner) y genera el código.
+     */
+    fun processIncomingUri(uri: Uri, contentType: ContentType? = null) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
+            try {
+                // Determinar tipo si no se provee
+                val resolvedType = contentType ?: resolveContentType(uri)
+                
+                // Pedir permiso persistente si es necesario
+                if (uri.scheme == "content") {
+                    try {
+                        application.contentResolver.takePersistableUriPermission(
+                            uri,
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (e: Exception) {
+                        Log.w("HomeViewModel", "No se pudo obtener permiso persistente para: $uri")
+                    }
+                }
+
+                val code = generateCodeUseCase()
+                val newLink = PaperLink(
+                    code = code,
+                    contentType = resolvedType,
+                    contentUri = uri.toString()
+                )
+                repository.insert(newLink)
+                _uiState.update { it.copy(isSaving = false, recentPhotoUri = null) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false) }
+                _events.emit(HomeEvent.Error("Error al guardar: ${e.localizedMessage}"))
+            }
+        }
+    }
+
+    private fun resolveContentType(uri: Uri): ContentType {
+        val mimeType = application.contentResolver.getType(uri) ?: ""
+        return when {
+            mimeType.startsWith("image/") -> ContentType.IMAGE
+            mimeType.startsWith("video/") -> ContentType.VIDEO
+            mimeType.startsWith("audio/") -> ContentType.AUDIO
+            mimeType == "application/pdf" -> ContentType.PDF
+            else -> ContentType.WEB_LINK // Fallback
+        }
+    }
+
+    /**
+     * Prepara una URI temporal para la cámara en el caché.
+     */
+    fun getTempCameraUri(): Uri {
+        val cacheDir = File(application.cacheDir, "camera")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        val file = File(cacheDir, "temp_capture_${System.currentTimeMillis()}.jpg")
+        return FileProvider.getUriForFile(
+            application,
+            "${application.packageName}.fileprovider",
+            file
+        )
+    }
+
+    fun onTakePhotoClicked() {
+        viewModelScope.launch {
+            _events.emit(HomeEvent.LaunchCamera)
+        }
+    }
 
     fun onSearchQueryChanged(newQuery: String) {
         val normalized = CodeAlphabet.normalize(newQuery)
@@ -71,7 +229,11 @@ class HomeViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = (this[APPLICATION_KEY] as PaperLinkApp)
-                HomeViewModel(application.container.paperLinkRepository, application)
+                HomeViewModel(
+                    application.container.paperLinkRepository,
+                    GenerateCodeUseCase(application.container.paperLinkRepository),
+                    application
+                )
             }
         }
     }
