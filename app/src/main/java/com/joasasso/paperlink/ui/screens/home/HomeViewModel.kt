@@ -226,7 +226,7 @@ class HomeViewModel(
     fun deleteLink() {
         val link = _uiState.value.linkToDelete ?: return
         viewModelScope.launch {
-            repository.delete(link, application.filesDir)
+            repository.delete(link, application.filesDir, application.cacheDir)
             _uiState.update { it.copy(linkToDelete = null) }
         }
     }
