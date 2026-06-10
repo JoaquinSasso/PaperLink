@@ -10,6 +10,8 @@ import com.joasasso.paperlink.ui.screens.home.HomeScreen
 import com.joasasso.paperlink.ui.screens.txt.TxtViewerScreen
 import kotlinx.serialization.Serializable
 
+import com.joasasso.paperlink.ui.screens.home.HomeViewModel
+
 // Rutas tipadas simplificadas: El detalle muere, las materias mueren.
 @Serializable object HomeDestination
 @Serializable object AddLinkDestination
@@ -18,6 +20,7 @@ import kotlinx.serialization.Serializable
 @Composable
 fun PaperLinkNavNavHost(
     navController: NavHostController,
+    homeViewModel: HomeViewModel, // Recibimos la instancia compartida
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -30,7 +33,8 @@ fun PaperLinkNavNavHost(
                 onNavigateToAdd = { navController.navigate(AddLinkDestination) },
                 onNavigateToTxtViewer = { uri, code ->
                     navController.navigate(TxtViewerDestination(uri = uri, code = code))
-                }
+                },
+                viewModel = homeViewModel // La inyectamos manualmente
             )
         }
 

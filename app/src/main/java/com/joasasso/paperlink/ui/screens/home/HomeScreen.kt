@@ -114,23 +114,24 @@ fun HomeScreen(
 
     // Reactivo a estado del ViewModel para lanzar cámara
     LaunchedEffect(uiState.shouldLaunchCamera) {
-        Log.d("PaperLinkDebug", "HomeScreen: shouldLaunchCamera changed to ${uiState.shouldLaunchCamera}")
+        Log.d("PaperLinkDebug", "[STEP 6] HomeScreen LaunchedEffect detected shouldLaunchCamera = ${uiState.shouldLaunchCamera}")
         if (uiState.shouldLaunchCamera) {
             val permissionCheck = ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.CAMERA
             )
+            Log.d("PaperLinkDebug", "[STEP 7] Camera permission status: $permissionCheck")
+            
             if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
-                Log.d("PaperLinkDebug", "   Permission GRANTED. Launching camera.")
+                Log.d("PaperLinkDebug", "[STEP 8] Permission granted. Getting URI and launching camera.")
                 val uri = viewModel.getTempCameraUri()
                 tempCameraUri = uri
+                Log.d("PaperLinkDebug", "[STEP 9] Launching camera with URI: $uri")
                 cameraLauncher.launch(uri)
                 viewModel.onCameraLaunched()
             } else {
-                Log.d("PaperLinkDebug", "   Permission DENIED. Requesting...")
+                Log.d("PaperLinkDebug", "[STEP 8B] Permission NOT granted. Requesting...")
                 permissionLauncher.launch(Manifest.permission.CAMERA)
-                // NO reseteamos aquí para que cuando el permiso sea concedido, el efecto se vuelva a disparar
-                // Pero para evitar bucles si deniega, reseteamos en el launcher de permisos también.
             }
         }
     }

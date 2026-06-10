@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.compose.rememberNavController
@@ -24,19 +25,32 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        
+        // El handleIntent DEBE ocurrir después de que Compose esté listo o asegurar que el ViewModel 
+        // mantenga el estado. Pero el log muestra que se llama bien.
+        // handleIntent(intent) // <--- Moveremos esto al final o lo dejaremos si el VM es compartido.
+
         setContent {
             PaperLinkTheme {
-                // Proveemos a la Actividad como dueña del ViewModelStore para que HomeScreen use la MISMA instancia
                 CompositionLocalProvider(
                     LocalViewModelStoreOwner provides this
                 ) {
+                    // Lanzamos el procesamiento del intent dentro del contexto de Compose
+                    // para asegurar que el ViewModelStoreOwner esté establecido y el VM sea el compartido.
+                    LaunchedEffect(intent) {
+                        handleIntent(intent)
+                    }
+
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
                         val navController = rememberNavController()
-                        PaperLinkNavNavHost(navController = navController)
+                        // PASO CLAVE: Pasamos la instancia física 'homeViewModel' al NavHost
+                        PaperLinkNavNavHost(
+                            navController = navController,
+                            homeViewModel = homeViewModel
+                        )
                     }
                 }
             }
@@ -58,28 +72,18 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         val action = intent?.action
         val data = intent?.data
-        Log.d("PaperLinkDebug", "MainActivity.handleIntent() -> action: $action, data: $data")
+        Log.d("PaperLinkDebug", "[STEP 1] MainActivity.handleIntent() -> action: $action")
         
-        // Log de extras para depuración profunda
-        intent?.extras?.let { extras ->
-            extras.keySet().forEach { key ->
-                Log.d("PaperLinkDebug", "   Extra: $key = ${extras.get(key)}")
-            }
-        }
-
-        when (action) {
-            Intent.ACTION_SEND -> {
-                val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
-                Log.d("PaperLinkDebug", "   Processing ACTION_SEND with URI: $uri")
-                uri?.let { homeViewModel.processIncomingUri(it) }
-            }
-            "com.joasasso.paperlink.ACTION_LAUNCH_CAMERA" -> {
-                Log.d("PaperLinkDebug", "   Processing ACTION_LAUNCH_CAMERA. Calling onTakePhotoClicked()")
-                homeViewModel.onTakePhotoClicked()
-            }
-            else -> {
-                Log.d("PaperLinkDebug", "   Action not handled: $action")
-            }
+        if (action == "com.joasasso.paperlink.ACTION_LAUNCH_CAMERA") {
+            Log.d("PaperLinkDebug", "[STEP 2] Widget action detected. Calling homeViewModel.onTakePhotoClicked()")
+            homeViewModel.onTakePhotoClicked()
+            intent.action = null
+            Log.d("PaperLinkDebug", "[STEP 3] Action cleared in Intent.")
+        } else if (action == Intent.ACTION_SEND) {
+            val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+            Log.d("PaperLinkDebug", "[STEP 1B] Share Intent with URI: $uri")
+            uri?.let { homeViewModel.processIncomingUri(it) }
+            intent.action = null
         }
     }
 }

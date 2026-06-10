@@ -48,15 +48,20 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
+    // Usamos un StateFlow interno para el estado de la cámara que no dependa del combine inicial
+    private val _shouldLaunchCamera = MutableStateFlow(false)
+
     val uiState: StateFlow<HomeUiState> = combine(
         _uiState,
-        repository.getAllLinks()
-    ) { state, links ->
-        state.copy(links = links)
+        repository.getAllLinks(),
+        _shouldLaunchCamera
+    ) { state, links, launchCamera ->
+        Log.d("PaperLinkDebug", "[FLOW] Combining state: launchCamera=$launchCamera")
+        state.copy(links = links, shouldLaunchCamera = launchCamera)
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = HomeUiState()
+        started = SharingStarted.Eagerly, // Cambiamos a Eagerly para que no se pierda nada al arrancar
+        initialValue = HomeUiState(shouldLaunchCamera = _shouldLaunchCamera.value)
     )
 
     private val _events = MutableSharedFlow<HomeEvent>()
@@ -194,13 +199,14 @@ class HomeViewModel(
     }
 
     fun onTakePhotoClicked() {
-        Log.d("PaperLinkDebug", "HomeViewModel.onTakePhotoClicked() -> Setting shouldLaunchCamera = true")
-        _uiState.update { it.copy(shouldLaunchCamera = true) }
+        Log.d("PaperLinkDebug", "[STEP 4] HomeViewModel.onTakePhotoClicked() -> setting _shouldLaunchCamera.value = true")
+        _shouldLaunchCamera.value = true
+        Log.d("PaperLinkDebug", "[STEP 5] _shouldLaunchCamera.value is now: ${_shouldLaunchCamera.value}")
     }
 
     fun onCameraLaunched() {
-        Log.d("PaperLinkDebug", "HomeViewModel.onCameraLaunched() -> Resetting shouldLaunchCamera = false")
-        _uiState.update { it.copy(shouldLaunchCamera = false) }
+        Log.d("PaperLinkDebug", "[STEP 10] HomeViewModel.onCameraLaunched() -> resetting _shouldLaunchCamera to false")
+        _shouldLaunchCamera.value = false
     }
 
     fun onSearchQueryChanged(newQuery: String) {
