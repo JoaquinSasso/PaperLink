@@ -185,12 +185,12 @@ class HomeViewModel(
     }
 
     /**
-     * Prepara una URI temporal para la cámara en el caché.
+     * Prepara una URI temporal para la cámara en el almacenamiento permanente interno.
      */
     fun getTempCameraUri(): Uri {
-        val cacheDir = File(application.cacheDir, "camera")
-        if (!cacheDir.exists()) cacheDir.mkdirs()
-        val file = File(cacheDir, "temp_capture_${System.currentTimeMillis()}.jpg")
+        val cameraDir = File(application.filesDir, "camera")
+        if (!cameraDir.exists()) cameraDir.mkdirs()
+        val file = File(cameraDir, "capture_${System.currentTimeMillis()}.jpg")
         return FileProvider.getUriForFile(
             application,
             "${application.packageName}.fileprovider",
@@ -226,7 +226,7 @@ class HomeViewModel(
     fun deleteLink() {
         val link = _uiState.value.linkToDelete ?: return
         viewModelScope.launch {
-            repository.delete(link, application.filesDir, application.cacheDir)
+            repository.delete(link, application.filesDir)
             _uiState.update { it.copy(linkToDelete = null) }
         }
     }
