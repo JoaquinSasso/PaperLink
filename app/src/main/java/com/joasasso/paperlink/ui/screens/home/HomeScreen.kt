@@ -65,6 +65,27 @@ fun HomeScreen(
     val context = LocalContext.current
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
+    // Launcher para Permisos de Galería (Banner)
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.checkRecentPhoto()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val permission = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        
+        if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+            storagePermissionLauncher.launch(permission)
+        }
+    }
+
     // Launcher para Cámara
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
@@ -74,37 +95,51 @@ fun HomeScreen(
         }
     }
 
-    // Launcher para Permisos
+    // Launcher para Permisos (Cámara)
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
+            Log.d("PaperLinkDebug", "Camera permission GRANTED from launcher.")
             val uri = viewModel.getTempCameraUri()
             tempCameraUri = uri
             cameraLauncher.launch(uri)
+            viewModel.onCameraLaunched()
         } else {
+            Log.d("PaperLinkDebug", "Camera permission DENIED from launcher.")
             Toast.makeText(context, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+            viewModel.onCameraLaunched()
         }
     }
 
-    // Escuchar eventos del ViewModel (LaunchCamera, Error)
+    // Reactivo a estado del ViewModel para lanzar cámara
+    LaunchedEffect(uiState.shouldLaunchCamera) {
+        Log.d("PaperLinkDebug", "HomeScreen: shouldLaunchCamera changed to ${uiState.shouldLaunchCamera}")
+        if (uiState.shouldLaunchCamera) {
+            val permissionCheck = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            )
+            if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                Log.d("PaperLinkDebug", "   Permission GRANTED. Launching camera.")
+                val uri = viewModel.getTempCameraUri()
+                tempCameraUri = uri
+                cameraLauncher.launch(uri)
+                viewModel.onCameraLaunched()
+            } else {
+                Log.d("PaperLinkDebug", "   Permission DENIED. Requesting...")
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+                // NO reseteamos aquí para que cuando el permiso sea concedido, el efecto se vuelva a disparar
+                // Pero para evitar bucles si deniega, reseteamos en el launcher de permisos también.
+            }
+        }
+    }
+
+    // Escuchar eventos de error del ViewModel
     LaunchedEffect(viewModel.events) {
         viewModel.events.collectLatest { event ->
             Log.d("PaperLinkDebug", "Event received in HomeScreen: $event")
             when (event) {
-                is HomeEvent.LaunchCamera -> {
-                    val permissionCheck = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.CAMERA
-                    )
-                    if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
-                        val uri = viewModel.getTempCameraUri()
-                        tempCameraUri = uri
-                        cameraLauncher.launch(uri)
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                }
                 is HomeEvent.Error -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }

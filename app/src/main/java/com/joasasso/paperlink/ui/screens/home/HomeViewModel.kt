@@ -33,11 +33,11 @@ data class HomeUiState(
     val links: List<PaperLink> = emptyList(),
     val linkToDelete: PaperLink? = null,
     val recentPhotoUri: Uri? = null,
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val shouldLaunchCamera: Boolean = false
 )
 
 sealed class HomeEvent {
-    object LaunchCamera : HomeEvent()
     data class Error(val message: String) : HomeEvent()
 }
 
@@ -194,9 +194,13 @@ class HomeViewModel(
     }
 
     fun onTakePhotoClicked() {
-        viewModelScope.launch {
-            _events.emit(HomeEvent.LaunchCamera)
-        }
+        Log.d("PaperLinkDebug", "HomeViewModel.onTakePhotoClicked() -> Setting shouldLaunchCamera = true")
+        _uiState.update { it.copy(shouldLaunchCamera = true) }
+    }
+
+    fun onCameraLaunched() {
+        Log.d("PaperLinkDebug", "HomeViewModel.onCameraLaunched() -> Resetting shouldLaunchCamera = false")
+        _uiState.update { it.copy(shouldLaunchCamera = false) }
     }
 
     fun onSearchQueryChanged(newQuery: String) {
