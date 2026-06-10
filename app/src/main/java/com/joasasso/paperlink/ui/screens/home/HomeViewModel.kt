@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
+import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import com.joasasso.paperlink.data.repository.PaperLinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
 import com.joasasso.paperlink.domain.GenerateCodeUseCase
@@ -34,7 +35,8 @@ data class HomeUiState(
     val linkToDelete: PaperLink? = null,
     val recentPhotoUri: Uri? = null,
     val isSaving: Boolean = false,
-    val shouldLaunchCamera: Boolean = false
+    val shouldLaunchCamera: Boolean = false,
+    val dismissedPhotoUris: Set<String> = emptySet()
 )
 
 sealed class HomeEvent {
@@ -43,25 +45,30 @@ sealed class HomeEvent {
 
 class HomeViewModel(
     private val repository: PaperLinkRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val generateCodeUseCase: GenerateCodeUseCase,
     private val application: Application
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
-    // Usamos un StateFlow interno para el estado de la cámara que no dependa del combine inicial
     private val _shouldLaunchCamera = MutableStateFlow(false)
 
     val uiState: StateFlow<HomeUiState> = combine(
         _uiState,
         repository.getAllLinks(),
-        _shouldLaunchCamera
-    ) { state, links, launchCamera ->
-        Log.d("PaperLinkDebug", "[FLOW] Combining state: launchCamera=$launchCamera")
-        state.copy(links = links, shouldLaunchCamera = launchCamera)
+        _shouldLaunchCamera,
+        userPreferencesRepository.dismissedUris
+    ) { state, links, launchCamera, dismissedUris ->
+        Log.d("PaperLinkDebug", "[FLOW] Combining state: launchCamera=$launchCamera, dismissedCount=${dismissedUris.size}")
+        state.copy(
+            links = links, 
+            shouldLaunchCamera = launchCamera,
+            dismissedPhotoUris = dismissedUris
+        )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly, // Cambiamos a Eagerly para que no se pierda nada al arrancar
-        initialValue = HomeUiState(shouldLaunchCamera = _shouldLaunchCamera.value)
+        started = SharingStarted.Eagerly,
+        initialValue = HomeUiState()
     )
 
     private val _events = MutableSharedFlow<HomeEvent>()
@@ -99,6 +106,13 @@ class HomeViewModel(
                     Log.d("HomeViewModel", "Query result count (Total): ${cursor.count}")
                     
                     if (cursor.moveToFirst()) {
+                        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                        val id = cursor.getLong(idColumn)
+                        val contentUri = ContentUris.withAppendedId(
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                            id
+                        )
+
                         val dateAddedSec = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
                         val dateTakenMs = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN))
                         
@@ -106,12 +120,14 @@ class HomeViewModel(
                         val diffAddedSec = nowSec - dateAddedSec
                         
                         Log.d("HomeViewModel", "Top photo: Added=${dateAddedSec} (diff=${diffAddedSec}s), Taken=${dateTakenMs}")
-
-                        // Si se añadió hace menos de 5 minutos (300s)
-                        if (diffAddedSec < 300) {
-                            updateRecentPhoto(cursor)
+                        Log.d("HomeViewModel", "Checking against dismissed list (size=${uiState.value.dismissedPhotoUris.size}): $contentUri")
+                        
+                        // Si se añadió hace menos de 5 minutos (300s) y no ha sido descartada
+                        if (diffAddedSec < 300 && !uiState.value.dismissedPhotoUris.contains(contentUri.toString())) {
+                            Log.d("HomeViewModel", "URI not dismissed. Showing banner.")
+                            _uiState.update { it.copy(recentPhotoUri = contentUri) }
                         } else {
-                            Log.d("HomeViewModel", "Top photo is too old: ${diffAddedSec}s")
+                            Log.d("HomeViewModel", "Top photo is too old or ALREADY dismissed: ${diffAddedSec}s")
                             _uiState.update { it.copy(recentPhotoUri = null) }
                         }
                     } else {
@@ -209,6 +225,15 @@ class HomeViewModel(
         _shouldLaunchCamera.value = false
     }
 
+    fun onDismissRecentPhoto() {
+        val uri = _uiState.value.recentPhotoUri ?: return
+        Log.d("PaperLinkDebug", "HomeViewModel.onDismissRecentPhoto() -> Dismissing URI: $uri")
+        viewModelScope.launch {
+            userPreferencesRepository.saveDismissedUri(uri.toString())
+            _uiState.update { it.copy(recentPhotoUri = null) }
+        }
+    }
+
     fun onSearchQueryChanged(newQuery: String) {
         val normalized = CodeAlphabet.normalize(newQuery)
         if (normalized.length <= CodeAlphabet.CODE_LENGTH) {
@@ -241,7 +266,8 @@ class HomeViewModel(
                 val application = (this[APPLICATION_KEY] as PaperLinkApp)
                 HomeViewModel(
                     application.container.paperLinkRepository,
-                    GenerateCodeUseCase(application.container.paperLinkRepository),
+                    application.container.userPreferencesRepository,
+                    application.container.generateCodeUseCase,
                     application
                 )
             }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -277,11 +278,12 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp)
         ) {
-            // Canal 2: Banner Inteligente de Foto Reciente
+            // Canal 2: Banner Inteligente de Foto Reciente (Deslizable)
             if (uiState.recentPhotoUri != null) {
-                SmartPhotoBanner(
+                DismissiblePhotoBanner(
                     uri = uiState.recentPhotoUri!!,
-                    onClick = { viewModel.processIncomingUri(it, ContentType.IMAGE) },
+                    onSelect = { viewModel.processIncomingUri(it, ContentType.IMAGE) },
+                    onDismiss = { viewModel.onDismissRecentPhoto() },
                     modifier = Modifier.padding(top = 16.dp)
                 )
             }
@@ -477,10 +479,43 @@ fun VisualLinkCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DismissiblePhotoBanner(
+    uri: Uri,
+    onSelect: (Uri) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd || value == SwipeToDismissBoxValue.EndToStart) {
+                onDismiss()
+                true
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { /* Fondo vacío o sutil indicador de borrado */ },
+        modifier = modifier
+    ) {
+        SmartPhotoBanner(
+            uri = uri,
+            onClick = { onSelect(uri) },
+            onDismiss = onDismiss
+        )
+    }
+}
+
 @Composable
 fun SmartPhotoBanner(
     uri: Uri,
     onClick: (Uri) -> Unit,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -503,7 +538,7 @@ fun SmartPhotoBanner(
                 contentScale = ContentScale.Crop
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Foto reciente detectada",
                     style = MaterialTheme.typography.titleSmall,
@@ -513,6 +548,13 @@ fun SmartPhotoBanner(
                     text = "Toca para generar código al instante",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Descartar",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                 )
             }
         }
