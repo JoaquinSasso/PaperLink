@@ -65,23 +65,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Forzamos un chequeo de foto reciente cada vez que la app vuelve al frente
+        // Al volver, forzamos un chequeo de foto reciente
+        // Nota: El init del VM ya observa cambios, pero onResume asegura refresco al volver de la cámara nativa
         homeViewModel.checkRecentPhoto()
     }
 
     private fun handleIntent(intent: Intent?) {
         val action = intent?.action
         val data = intent?.data
-        Log.d("PaperLinkDebug", "[STEP 1] MainActivity.handleIntent() -> action: $action")
         
         if (action == "com.joasasso.paperlink.ACTION_LAUNCH_CAMERA") {
-            Log.d("PaperLinkDebug", "[STEP 2] Widget action detected. Calling homeViewModel.onTakePhotoClicked()")
             homeViewModel.onTakePhotoClicked()
             intent.action = null
-            Log.d("PaperLinkDebug", "[STEP 3] Action cleared in Intent.")
         } else if (action == Intent.ACTION_SEND) {
             val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
-            Log.d("PaperLinkDebug", "[STEP 1B] Share Intent with URI: $uri")
             uri?.let { homeViewModel.processIncomingUri(it) }
             intent.action = null
         }

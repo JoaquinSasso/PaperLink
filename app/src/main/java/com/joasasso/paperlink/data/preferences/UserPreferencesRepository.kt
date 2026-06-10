@@ -32,11 +32,13 @@ class UserPreferencesRepository(private val context: Context) {
             }
         }
         .map { preferences ->
-            preferences[PreferencesKeys.DISMISSED_URIS] ?: emptySet()
+            val set = preferences[PreferencesKeys.DISMISSED_URIS] ?: emptySet()
+            Log.d("PaperLinkBanner", "[DATASTORE READ] Loaded ${set.size} URIs from disk")
+            set
         }
 
     suspend fun saveDismissedUri(uri: String) {
-        Log.d("UserPreferences", "Saving dismissed URI to disk: $uri")
+        Log.d("PaperLinkBanner", "[DATASTORE WRITE] Saving URI to disk: $uri")
         context.dataStore.edit { preferences ->
             val currentUris = preferences[PreferencesKeys.DISMISSED_URIS] ?: emptySet()
             preferences[PreferencesKeys.DISMISSED_URIS] = currentUris + uri

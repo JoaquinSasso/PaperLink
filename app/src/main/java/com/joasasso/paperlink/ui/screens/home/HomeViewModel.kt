@@ -75,7 +75,14 @@ class HomeViewModel(
     val events = _events.asSharedFlow()
 
     init {
-        checkRecentPhoto()
+        // Observamos los cambios en las URIs descartadas para refrescar el banner
+        // Esto también soluciona el problema de que el MediaStore se consulta antes de cargar el DataStore
+        viewModelScope.launch {
+            userPreferencesRepository.dismissedUris.collectLatest { dismissed ->
+                Log.d("PaperLinkBanner", "[INIT] Dismissed URIs updated in ViewModel. Size: ${dismissed.size}")
+                checkRecentPhoto()
+            }
+        }
     }
 
     /**
@@ -93,9 +100,6 @@ class HomeViewModel(
                 val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
                 val fiveMinutesAgoMs = System.currentTimeMillis() - (5 * 60 * 1000)
 
-                Log.d("HomeViewModel", "Querying MediaStore: current=${System.currentTimeMillis()}, threshold=$fiveMinutesAgoMs")
-
-                // Estrategia: Consultamos las más recientes añadidas (DATE_ADDED) que suele ser más fiable para "acaba de pasar"
                 application.contentResolver.query(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     projection,
@@ -103,8 +107,6 @@ class HomeViewModel(
                     null,
                     sortOrder
                 )?.use { cursor ->
-                    Log.d("HomeViewModel", "Query result count (Total): ${cursor.count}")
-                    
                     if (cursor.moveToFirst()) {
                         val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                         val id = cursor.getLong(idColumn)
@@ -119,19 +121,18 @@ class HomeViewModel(
                         val nowSec = System.currentTimeMillis() / 1000
                         val diffAddedSec = nowSec - dateAddedSec
                         
-                        Log.d("HomeViewModel", "Top photo: Added=${dateAddedSec} (diff=${diffAddedSec}s), Taken=${dateTakenMs}")
-                        Log.d("HomeViewModel", "Checking against dismissed list (size=${uiState.value.dismissedPhotoUris.size}): $contentUri")
-                        
+                        val isDismissed = uiState.value.dismissedPhotoUris.contains(contentUri.toString())
+                        Log.d("PaperLinkBanner", "[BANNER CHECK] URI: $contentUri | diff: ${diffAddedSec}s | isDismissed: $isDismissed")
+
                         // Si se añadió hace menos de 5 minutos (300s) y no ha sido descartada
-                        if (diffAddedSec < 300 && !uiState.value.dismissedPhotoUris.contains(contentUri.toString())) {
-                            Log.d("HomeViewModel", "URI not dismissed. Showing banner.")
+                        if (diffAddedSec < 300 && !isDismissed) {
+                            Log.d("PaperLinkBanner", "[BANNER CHECK] SUCCESS: Showing banner.")
                             _uiState.update { it.copy(recentPhotoUri = contentUri) }
                         } else {
-                            Log.d("HomeViewModel", "Top photo is too old or ALREADY dismissed: ${diffAddedSec}s")
+                            Log.d("PaperLinkBanner", "[BANNER CHECK] SKIPPED: Too old or dismissed.")
                             _uiState.update { it.copy(recentPhotoUri = null) }
                         }
                     } else {
-                        Log.d("HomeViewModel", "No photos found at all")
                         _uiState.update { it.copy(recentPhotoUri = null) }
                     }
                 }
@@ -215,22 +216,23 @@ class HomeViewModel(
     }
 
     fun onTakePhotoClicked() {
-        Log.d("PaperLinkDebug", "[STEP 4] HomeViewModel.onTakePhotoClicked() -> setting _shouldLaunchCamera.value = true")
         _shouldLaunchCamera.value = true
-        Log.d("PaperLinkDebug", "[STEP 5] _shouldLaunchCamera.value is now: ${_shouldLaunchCamera.value}")
     }
 
     fun onCameraLaunched() {
-        Log.d("PaperLinkDebug", "[STEP 10] HomeViewModel.onCameraLaunched() -> resetting _shouldLaunchCamera to false")
         _shouldLaunchCamera.value = false
     }
 
     fun onDismissRecentPhoto() {
         val uri = _uiState.value.recentPhotoUri ?: return
-        Log.d("PaperLinkDebug", "HomeViewModel.onDismissRecentPhoto() -> Dismissing URI: $uri")
+        Log.d("PaperLinkBanner", "[BANNER STEP 1] User requested dismissal for URI: $uri")
         viewModelScope.launch {
+            Log.d("PaperLinkBanner", "[BANNER STEP 2] Calling userPreferencesRepository.saveDismissedUri($uri)")
             userPreferencesRepository.saveDismissedUri(uri.toString())
-            _uiState.update { it.copy(recentPhotoUri = null) }
+            _uiState.update { 
+                Log.d("PaperLinkBanner", "[BANNER STEP 3] Local UI State updated: recentPhotoUri = null")
+                it.copy(recentPhotoUri = null) 
+            }
         }
     }
 
