@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.joasasso.paperlink.PaperLinkApp
+import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
@@ -177,7 +178,7 @@ class HomeViewModel(
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error al procesar URI: $uri", e)
                 _uiState.update { it.copy(isSaving = false) }
-                _events.emit(HomeEvent.Error("Error al guardar: ${e.localizedMessage}"))
+                _events.emit(HomeEvent.Error(application.getString(R.string.home_error_saving, e.localizedMessage ?: "")))
             }
         }
     }

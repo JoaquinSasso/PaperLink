@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
+import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.data.repository.PaperLinkRepository
@@ -78,7 +79,7 @@ class AddLinkViewModel(
             contentResolver.takePersistableUriPermission(uri, takeFlags)
             _uiState.update { it.copy(contentUri = uri.toString()) }
         } catch (e: Exception) {
-            _uiState.update { it.copy(errorMessage = "Error de permisos: ${e.localizedMessage}") }
+            _uiState.update { it.copy(errorMessage = application.getString(R.string.add_permission_error, e.localizedMessage ?: "")) }
         }
     }
 

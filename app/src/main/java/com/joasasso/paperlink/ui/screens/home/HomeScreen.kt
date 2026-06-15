@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -46,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.ContentType
 import com.joasasso.paperlink.data.local.PaperLink
 import com.joasasso.paperlink.ui.components.ThumbnailImage
@@ -108,7 +110,7 @@ fun HomeScreen(
             viewModel.onCameraLaunched()
         } else {
             Log.d("PaperLinkDebug", "Camera permission DENIED from launcher.")
-            Toast.makeText(context, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.home_camera_permission_denied), Toast.LENGTH_SHORT).show()
             viewModel.onCameraLaunched()
         }
     }
@@ -204,19 +206,19 @@ fun HomeScreen(
     if (uiState.linkToDelete != null) {
         AlertDialog(
             onDismissRequest = { viewModel.confirmDelete(null) },
-            title = { Text("¿Eliminar vínculo?") },
-            text = { Text("Se borrará el código ${uiState.linkToDelete?.code} de forma permanente.") },
+            title = { Text(stringResource(R.string.home_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.home_delete_confirm_text, uiState.linkToDelete?.code ?: "")) },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.deleteLink() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
-                    Text("Eliminar")
+                    Text(stringResource(R.string.home_delete_confirm_btn))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.confirmDelete(null) }) {
-                    Text("Cancelar")
+                    Text(stringResource(R.string.home_cancel_btn))
                 }
             },
         )
@@ -253,7 +255,7 @@ fun HomeScreen(
                     ) {
                         Icon(Icons.Default.Add, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Enlace / Archivo")
+                        Text(stringResource(R.string.home_add_btn))
                     }
 
                     VerticalDivider(
@@ -275,7 +277,7 @@ fun HomeScreen(
                     ) {
                         Icon(Icons.Default.CameraAlt, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Tomar Foto")
+                        Text(stringResource(R.string.home_take_photo_btn))
                     }
                 }
             }
@@ -550,12 +552,12 @@ fun SmartPhotoBanner(
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Foto reciente detectada",
+                    text = stringResource(R.string.home_recent_photo_title),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text = "Toca para generar código al instante",
+                    text = stringResource(R.string.home_recent_photo_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
@@ -563,7 +565,7 @@ fun SmartPhotoBanner(
             IconButton(onClick = onDismiss) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Descartar",
+                    contentDescription = stringResource(R.string.home_dismiss_cd),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                 )
             }

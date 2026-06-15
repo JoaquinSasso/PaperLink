@@ -69,7 +69,7 @@ fun AddLinkScreen(
                 title = { Text(stringResource(R.string.add_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.add_back_cd))
                     }
                 }
             )
@@ -122,7 +122,7 @@ fun AddLinkScreen(
             // FASE 2: Entrada de Datos
             else {
                 Text(
-                    text = "Tipo: ${uiState.selectedType?.name}",
+                    text = "${stringResource(R.string.add_select_content_type)}: ${uiState.selectedType?.name}",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -132,7 +132,7 @@ fun AddLinkScreen(
                         OutlinedTextField(
                             value = uiState.contentUri,
                             onValueChange = { viewModel.onWebUrlEntered(it) },
-                            label = { Text("URL (https://...)") },
+                            label = { Text(stringResource(R.string.add_url_label)) },
                             modifier = Modifier.fillMaxWidth(),
                             leadingIcon = { Icon(ContentTypeIcons.getIcon(ContentType.WEB_LINK), null) },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -148,7 +148,7 @@ fun AddLinkScreen(
                         OutlinedTextField(
                             value = uiState.nativeNoteContent,
                             onValueChange = { viewModel.onNativeNoteContentChanged(it) },
-                            label = { Text("Escribe tu nota aquí...") },
+                            label = { Text(stringResource(R.string.add_note_label)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp),
@@ -163,7 +163,7 @@ fun AddLinkScreen(
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Text(
-                                    text = if (uiState.contentUri.isNotBlank()) "Archivo seleccionado" else "Ningún archivo seleccionado",
+                                    text = if (uiState.contentUri.isNotBlank()) stringResource(R.string.add_file_selected) else stringResource(R.string.add_no_file_selected),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 
@@ -181,7 +181,7 @@ fun AddLinkScreen(
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Seleccionar archivo")
+                                    Text(stringResource(R.string.add_select_file_btn))
                                 }
                             }
                         }

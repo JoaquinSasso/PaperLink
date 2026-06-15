@@ -11,4 +11,35 @@
     <string name="add_select_content_type">Select type</string>
 
     <string name="cd_back">Back</string>
+    <string name="home_camera_permission_denied">Camera permission denied</string>
+    <string name="home_delete_confirm_title">Delete link?</string>
+    <string name="home_delete_confirm_text">Code %1$s will be permanently deleted.</string>
+    <string name="home_delete_confirm_btn">Delete</string>
+    <string name="home_cancel_btn">Cancel</string>
+    <string name="home_add_btn">Link / File</string>
+    <string name="home_take_photo_btn">Take Photo</string>
+    <string name="home_recent_photo_title">Recent photo detected</string>
+    <string name="home_recent_photo_subtitle">Tap to generate code instantly</string>
+    <string name="home_dismiss_cd">Dismiss</string>
+    <string name="home_error_saving">Error saving: %1$s</string>
+
+    <string name="add_back_cd">Back</string>
+    <string name="add_url_label">URL (https://...)</string>
+    <string name="add_note_label">Write your note here...</string>
+    <string name="add_file_selected">File selected</string>
+    <string name="add_no_file_selected">No file selected</string>
+    <string name="add_select_file_btn">Select file</string>
+    <string name="add_permission_error">Permission error: %1$s</string>
+
+    <string name="txt_back_save_cd">Back and Save</string>
+    <string name="txt_view_btn">View</string>
+    <string name="txt_edit_btn">Edit</string>
+    <string name="txt_save_btn">Save</string>
+    <string name="txt_error_title">Error</string>
+    <string name="txt_exit_no_save_btn">Exit without saving</string>
+    <string name="txt_retry_btn">Retry</string>
+    <string name="txt_error_open_write">Could not open file for writing</string>
+    <string name="txt_error_save">Error saving: %1$s</string>
+    <string name="txt_error_open">Could not open file</string>
+    <string name="txt_error_read">Error reading file: %1$s</string>
 </resources>

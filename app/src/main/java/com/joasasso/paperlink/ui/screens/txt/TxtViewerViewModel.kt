@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.toRoute
 import com.joasasso.paperlink.PaperLinkApp
+import com.joasasso.paperlink.R
 import com.joasasso.paperlink.ui.navigation.TxtViewerDestination
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,12 +71,12 @@ class TxtViewerViewModel(
                     val uri = Uri.parse(uriString)
                     application.contentResolver.openOutputStream(uri, "wt")?.use { outputStream ->
                         outputStream.bufferedWriter().use { it.write(currentText) }
-                    } ?: throw Exception("No se pudo abrir el archivo para escritura")
+                    } ?: throw Exception(application.getString(R.string.txt_error_open_write))
                 }
                 onComplete()
             } catch (e: Exception) {
                 _uiState.update { 
-                    it.copy(errorMessage = "Error al guardar: ${e.localizedMessage}") 
+                    it.copy(errorMessage = application.getString(R.string.txt_error_save, e.localizedMessage ?: "")) 
                 }
                 // Incluso si falla, permitimos salir o mostramos el error? 
                 // Por ahora mostramos error y no cerramos para no perder cambios.
@@ -92,7 +93,7 @@ class TxtViewerViewModel(
                     val uri = Uri.parse(uriString)
                     application.contentResolver.openInputStream(uri)?.use { inputStream ->
                         inputStream.bufferedReader().use { it.readText() }
-                    } ?: throw Exception("No se pudo abrir el archivo")
+                    } ?: throw Exception(application.getString(R.string.txt_error_open))
                 }
                 Log.d("PaperLinkDebug", "Texto cargado con éxito. Longitud: ${content.length}")
                 _uiState.update { it.copy(text = content, isLoading = false) }
@@ -101,7 +102,7 @@ class TxtViewerViewModel(
                 _uiState.update { 
                     it.copy(
                         isLoading = false, 
-                        errorMessage = "Error al leer el archivo: ${e.localizedMessage}"
+                        errorMessage = application.getString(R.string.txt_error_read, e.localizedMessage ?: "")
                     ) 
                 }
             }

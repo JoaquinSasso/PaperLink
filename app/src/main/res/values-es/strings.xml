@@ -11,4 +11,35 @@
     <string name="add_select_content_type">Seleccionar tipo</string>
 
     <string name="cd_back">Atrás</string>
+    <string name="home_camera_permission_denied">Permiso de cámara denegado</string>
+    <string name="home_delete_confirm_title">¿Eliminar vínculo?</string>
+    <string name="home_delete_confirm_text">Se borrará el código %1$s de forma permanente.</string>
+    <string name="home_delete_confirm_btn">Eliminar</string>
+    <string name="home_cancel_btn">Cancelar</string>
+    <string name="home_add_btn">Enlace / Archivo</string>
+    <string name="home_take_photo_btn">Tomar Foto</string>
+    <string name="home_recent_photo_title">Foto reciente detectada</string>
+    <string name="home_recent_photo_subtitle">Toca para generar código al instante</string>
+    <string name="home_dismiss_cd">Descartar</string>
+    <string name="home_error_saving">Error al guardar: %1$s</string>
+
+    <string name="add_back_cd">Atrás</string>
+    <string name="add_url_label">URL (https://...)</string>
+    <string name="add_note_label">Escribe tu nota aquí...</string>
+    <string name="add_file_selected">Archivo seleccionado</string>
+    <string name="add_no_file_selected">Ningún archivo seleccionado</string>
+    <string name="add_select_file_btn">Seleccionar archivo</string>
+    <string name="add_permission_error">Error de permisos: %1$s</string>
+
+    <string name="txt_back_save_cd">Volver y Guardar</string>
+    <string name="txt_view_btn">Ver</string>
+    <string name="txt_edit_btn">Editar</string>
+    <string name="txt_save_btn">Guardar</string>
+    <string name="txt_error_title">Error</string>
+    <string name="txt_exit_no_save_btn">Salir sin guardar</string>
+    <string name="txt_retry_btn">Reintentar</string>
+    <string name="txt_error_open_write">No se pudo abrir el archivo para escritura</string>
+    <string name="txt_error_save">Error al guardar: %1$s</string>
+    <string name="txt_error_open">No se pudo abrir el archivo</string>
+    <string name="txt_error_read">Error al leer el archivo: %1$s</string>
 </resources>

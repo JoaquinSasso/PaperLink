@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -26,6 +27,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import com.joasasso.paperlink.PaperLinkApp
+import com.joasasso.paperlink.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +59,7 @@ fun TxtViewerScreen(
                     IconButton(onClick = { viewModel.saveChanges(onNavigateBack) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver y Guardar"
+                            contentDescription = stringResource(R.string.txt_back_save_cd)
                         )
                     }
                 },
@@ -75,7 +77,7 @@ fun TxtViewerScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = if (uiState.isEditMode) "Ver" else "Editar",
+                                text = if (uiState.isEditMode) stringResource(R.string.txt_view_btn) else stringResource(R.string.txt_edit_btn),
                                 style = MaterialTheme.typography.labelLarge
                             )
                         }
@@ -92,7 +94,7 @@ fun TxtViewerScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Guardar",
+                            text = stringResource(R.string.txt_save_btn),
                             style = MaterialTheme.typography.labelLarge
                         )
                     }
@@ -112,16 +114,16 @@ fun TxtViewerScreen(
                 uiState.errorMessage != null -> {
                     AlertDialog(
                         onDismissRequest = { },
-                        title = { Text("Error") },
+                        title = { Text(stringResource(R.string.txt_error_title)) },
                         text = { Text(uiState.errorMessage!!) },
                         confirmButton = {
                             TextButton(onClick = onNavigateBack) {
-                                Text("Salir sin guardar")
+                                Text(stringResource(R.string.txt_exit_no_save_btn))
                             }
                         },
                         dismissButton = {
                             TextButton(onClick = { viewModel.saveChanges(onNavigateBack) }) {
-                                Text("Reintentar")
+                                Text(stringResource(R.string.txt_retry_btn))
                             }
                         }
                     )
