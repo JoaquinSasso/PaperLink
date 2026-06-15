@@ -163,30 +163,86 @@ class HomeViewModel(
                 // Determinar tipo si no se provee
                 val resolvedType = contentType ?: resolveContentType(uri)
                 
-                // Pedir permiso persistente si es necesario
-                if (uri.scheme == "content") {
-                    try {
-                        application.contentResolver.takePersistableUriPermission(
-                            uri,
-                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    } catch (e: Exception) {
-                        Log.w("HomeViewModel", "No se pudo obtener permiso persistente para: $uri")
-                    }
-                }
+                // Asegurar que tenemos una URI estable (referencia persistente o copia interna)
+                val stableUri = ensureStableUri(uri, resolvedType)
 
                 val code = generateCodeUseCase()
                 val newLink = PaperLink(
                     code = code,
                     contentType = resolvedType,
-                    contentUri = uri.toString()
+                    contentUri = stableUri.toString()
                 )
                 repository.insert(newLink)
                 _uiState.update { it.copy(isSaving = false, recentPhotoUri = null) }
             } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error al procesar URI: $uri", e)
                 _uiState.update { it.copy(isSaving = false) }
                 _events.emit(HomeEvent.Error("Error al guardar: ${e.localizedMessage}"))
             }
+        }
+    }
+
+    /**
+     * Intenta persistir la URI o realiza una copia interna si es temporal.
+     */
+    private suspend fun ensureStableUri(uri: Uri, type: ContentType): Uri = withContext(Dispatchers.IO) {
+        // 1. Si es MediaStore (galería de Android), intentamos tomar permiso persistente.
+        // Las URIs de MediaStore son estables.
+        if (uri.authority == "media" || uri.toString().contains("media/external")) {
+            try {
+                application.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                return@withContext uri
+            } catch (e: Exception) {
+                Log.d("HomeViewModel", "No se pudo persistir permiso para MediaStore, se procederá a copia: $uri")
+            }
+        }
+
+        // 2. Si ya es una URI interna de nuestra propia app, no hacemos nada.
+        if (uri.toString().contains(application.packageName)) {
+            return@withContext uri
+        }
+
+        // 3. Fallback: Copiamos el archivo al almacenamiento interno.
+        // Esto cubre Google Fotos (content://com.google.android.apps.photos.contentprovider...)
+        // y cualquier otro proveedor de contenido temporal.
+        return@withContext copyUriToInternal(uri, type)
+    }
+
+    /**
+     * Copia el contenido de una URI al almacenamiento interno de la app.
+     */
+    private fun copyUriToInternal(uri: Uri, type: ContentType): Uri {
+        val sharedDir = File(application.filesDir, "shared")
+        if (!sharedDir.exists()) sharedDir.mkdirs()
+
+        val extension = when (type) {
+            ContentType.IMAGE -> "jpg"
+            ContentType.VIDEO -> "mp4"
+            ContentType.AUDIO -> "m4a"
+            ContentType.PDF -> "pdf"
+            else -> "bin"
+        }
+        val fileName = "shared_${System.currentTimeMillis()}.$extension"
+        val destFile = File(sharedDir, fileName)
+
+        try {
+            application.contentResolver.openInputStream(uri)?.use { input ->
+                destFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            // Retornamos una URI de FileProvider para que sea compartible en el futuro
+            return FileProvider.getUriForFile(
+                application,
+                "${application.packageName}.fileprovider",
+                destFile
+            )
+        } catch (e: Exception) {
+            Log.e("HomeViewModel", "Error copiando archivo interno", e)
+            return uri // Devolvemos la original como último recurso
         }
     }
 

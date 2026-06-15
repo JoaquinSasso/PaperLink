@@ -3,4 +3,5 @@
     <files-path name="my_images" path="images/" />
     <files-path name="my_notes" path="notes/" />
     <files-path name="camera_photos" path="camera/" />
+    <files-path name="shared_media" path="shared/" />
 </paths>

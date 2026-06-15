@@ -171,8 +171,18 @@ fun HomeScreen(
             } else {
                 try {
                     Log.d("PaperLinkDebug", "Lanzando Intent externo para: ${link.contentUri}")
+                    
+                    // Mejoramos la determinación del MIME type para el Intent
+                    val intentMimeType = when(link.contentType) {
+                        com.joasasso.paperlink.data.local.ContentType.IMAGE -> "image/*"
+                        com.joasasso.paperlink.data.local.ContentType.VIDEO -> "video/*"
+                        com.joasasso.paperlink.data.local.ContentType.AUDIO -> "audio/*"
+                        com.joasasso.paperlink.data.local.ContentType.PDF -> "application/pdf"
+                        else -> mimeType ?: "*/*"
+                    }
+
                     val intent = Intent(Intent.ACTION_VIEW).apply {
-                        data = uri
+                        setDataAndType(uri, intentMimeType)
                         flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                     }
                     context.startActivity(intent)

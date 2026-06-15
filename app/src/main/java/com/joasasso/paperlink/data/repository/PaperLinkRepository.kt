@@ -39,11 +39,17 @@ class PaperLinkRepository(
                     if (uriString.contains(internalPath) || uriString.contains("com.joasasso.paperlink")) {
                         // Nota: Solo borramos si NO es MediaStore (galería compartida)
                         if (!uriString.contains("media/external")) {
-                            // Borrado de fotos de cámara interna (ahora permanentes en files/camera)
+                            // Borrado de fotos de cámara interna
                             if (uriString.contains("camera_photos") || uriString.contains("files/camera")) {
                                 val fileName = uriString.substringAfterLast("/")
                                 val cameraFile = File(File(filesDir, "camera"), fileName)
                                 if (cameraFile.exists()) cameraFile.delete()
+                            }
+                            // Borrado de medios compartidos (copias internas de Share Intent)
+                            else if (uriString.contains("shared_media") || uriString.contains("files/shared")) {
+                                val fileName = uriString.substringAfterLast("/")
+                                val sharedFile = File(File(filesDir, "shared"), fileName)
+                                if (sharedFile.exists()) sharedFile.delete()
                             }
                         }
                     }
