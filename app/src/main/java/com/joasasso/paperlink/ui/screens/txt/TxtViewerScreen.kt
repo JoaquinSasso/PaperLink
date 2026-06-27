@@ -1,5 +1,6 @@
 package com.joasasso.paperlink.ui.screens.txt
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,7 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -28,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.R
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +39,10 @@ fun TxtViewerScreen(
     onNavigateBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val application = context.applicationContext as PaperLinkApp
+    
+    val saveSuccessMsg = stringResource(R.string.txt_save_success)
     
     val viewModelStoreOwner = LocalViewModelStoreOwner.current
     val savedStateHandle = (viewModelStoreOwner as? NavBackStackEntry)?.savedStateHandle
@@ -46,6 +53,16 @@ fun TxtViewerScreen(
     )
     
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(viewModel.events) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is TxtViewerEvent.SaveSuccess -> {
+                    Toast.makeText(context, saveSuccessMsg, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     BackHandler {
         viewModel.saveChanges(onNavigateBack)
@@ -83,7 +100,10 @@ fun TxtViewerScreen(
                         }
                     }
                     Button(
-                        onClick = { viewModel.saveChanges({}) },
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.saveChanges({}) 
+                        },
                         modifier = Modifier.padding(end = 8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                     ) {

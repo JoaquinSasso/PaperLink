@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -33,8 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +72,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     // Launcher para Permisos de Galería (Banner)
@@ -154,7 +161,10 @@ fun HomeScreen(
     // Lógica robusta para abrir archivo
     val openFile: (String) -> Unit = { code ->
         Log.d("PaperLinkDebug", "Intentando abrir código: $code")
-        viewModel.findLinkByCode(code)?.let { link ->
+        val link = viewModel.findLinkByCode(code)
+        
+        if (link != null) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             val uri = link.contentUri.toUri()
             val mimeType = context.contentResolver.getType(uri)
             
@@ -192,7 +202,12 @@ fun HomeScreen(
                     Log.e("PaperLinkDebug", "Error al abrir intent externo: ${e.localizedMessage}")
                 }
             }
-        } ?: Log.w("PaperLinkDebug", "No se encontró ningún link con el código: $code")
+        } else {
+            Log.w("PaperLinkDebug", "No se encontró ningún link con el código: $code")
+            if (code.length == 4) {
+                vibrate(context, duration = 400, amplitude = 255)
+            }
+        }
     }
 
     // Disparador reactivo: En cuanto el código llega a 4, intentamos abrir
@@ -307,8 +322,25 @@ fun HomeScreen(
                 onEnter = { openFile(uiState.searchQuery) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 32.dp)
+                    .padding(top = 32.dp, bottom = 8.dp)
             )
+
+            // Mensaje de Error (debajo del input)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                if (uiState.errorMessage != null) {
+                    Text(
+                        text = uiState.errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
 
             if (uiState.isSaving) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
@@ -332,6 +364,11 @@ fun HomeScreen(
             }
         }
     }
+}
+
+private fun vibrate(context: android.content.Context, duration: Long, amplitude: Int) {
+    val vibrator = context.getSystemService(Vibrator::class.java)
+    vibrator?.vibrate(VibrationEffect.createOneShot(duration, amplitude))
 }
 
 @Composable

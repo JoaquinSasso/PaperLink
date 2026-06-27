@@ -14,8 +14,11 @@ import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.ui.navigation.TxtViewerDestination
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -30,6 +33,10 @@ data class TxtViewerUiState(
     val isEditMode: Boolean = false
 )
 
+sealed class TxtViewerEvent {
+    object SaveSuccess : TxtViewerEvent()
+}
+
 class TxtViewerViewModel(
     savedStateHandle: SavedStateHandle,
     private val application: Application
@@ -39,6 +46,9 @@ class TxtViewerViewModel(
     
     private val _uiState = MutableStateFlow(TxtViewerUiState(code = destination.code))
     val uiState: StateFlow<TxtViewerUiState> = _uiState.asStateFlow()
+
+    private val _events = MutableSharedFlow<TxtViewerEvent>()
+    val events: SharedFlow<TxtViewerEvent> = _events.asSharedFlow()
 
     init {
         val uriString = destination.uri
@@ -73,6 +83,7 @@ class TxtViewerViewModel(
                         outputStream.bufferedWriter().use { it.write(currentText) }
                     } ?: throw Exception(application.getString(R.string.txt_error_open_write))
                 }
+                _events.emit(TxtViewerEvent.SaveSuccess)
                 onComplete()
             } catch (e: Exception) {
                 _uiState.update { 

@@ -37,7 +37,8 @@ data class HomeUiState(
     val recentPhotoUri: Uri? = null,
     val isSaving: Boolean = false,
     val shouldLaunchCamera: Boolean = false,
-    val dismissedPhotoUris: Set<String> = emptySet()
+    val dismissedPhotoUris: Set<String> = emptySet(),
+    val errorMessage: String? = null
 )
 
 sealed class HomeEvent {
@@ -298,7 +299,8 @@ class HomeViewModel(
         if (normalized.length <= CodeAlphabet.CODE_LENGTH) {
             _uiState.update { it.copy(
                 searchQuery = normalized,
-                isQueryValid = CodeAlphabet.isValid(normalized)
+                isQueryValid = CodeAlphabet.isValid(normalized),
+                errorMessage = null
             ) }
         }
     }
@@ -316,7 +318,11 @@ class HomeViewModel(
     }
 
     fun findLinkByCode(code: String): PaperLink? {
-        return uiState.value.links.find { it.code.equals(code, ignoreCase = true) }
+        val link = uiState.value.links.find { it.code.equals(code, ignoreCase = true) }
+        if (link == null && code.length == 4) {
+            _uiState.update { it.copy(errorMessage = application.getString(R.string.home_code_not_found)) }
+        }
+        return link
     }
 
     companion object {

@@ -22,6 +22,7 @@
     <string name="home_recent_photo_subtitle">Tap to generate code instantly</string>
     <string name="home_dismiss_cd">Dismiss</string>
     <string name="home_error_saving">Error saving: %1$s</string>
+    <string name="home_code_not_found">Code not found</string>
 
     <string name="add_back_cd">Back</string>
     <string name="add_url_label">URL (https://...)</string>
@@ -42,4 +43,5 @@
     <string name="txt_error_save">Error saving: %1$s</string>
     <string name="txt_error_open">Could not open file</string>
     <string name="txt_error_read">Error reading file: %1$s</string>
+    <string name="txt_save_success">Changes saved successfully</string>
 </resources>
