@@ -44,4 +44,21 @@
     <string name="txt_error_open">Could not open file</string>
     <string name="txt_error_read">Error reading file: %1$s</string>
     <string name="txt_save_success">Changes saved successfully</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_btn_skip">Skip</string>
+    <string name="onboarding_btn_next">Next</string>
+    <string name="onboarding_btn_finish">Get Started</string>
+
+    <string name="onboarding_title_page1">Welcome to PaperLink!</string>
+    <string name="onboarding_desc_page1">Bring your physical notebooks to life. Link your paper notes to local files, documents, and videos securely, 100% offline and private.</string>
+
+    <string name="onboarding_title_page2">1. Snap or Link</string>
+    <string name="onboarding_desc_page2">Quickly capture a whiteboard with your camera or select any local PDF, video, or web link from the add menu.</string>
+
+    <string name="onboarding_title_page3">2. Write the Code</string>
+    <string name="onboarding_desc_page3">The app will generate a unique 4-character code. Jot it down by hand on the margin of your paper notebook.</string>
+
+    <string name="onboarding_title_page4">3. Open Instantly</string>
+    <string name="onboarding_desc_page4">Whenever you review your notes and need the file, enter the code in PaperLink. Your digital document opens in a flash!</string>
 </resources>

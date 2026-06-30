@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -20,6 +21,26 @@ class UserPreferencesRepository(private val context: Context) {
 
     private object PreferencesKeys {
         val DISMISSED_URIS = stringSetPreferencesKey("dismissed_photo_uris")
+        val IS_FIRST_LAUNCH = booleanPreferencesKey("is_first_launch")
+    }
+
+    val isFirstLaunch: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                Log.e("UserPreferences", "Error reading preferences.", exception)
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.IS_FIRST_LAUNCH] ?: true
+        }
+
+    suspend fun setFirstLaunchCompleted() {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.IS_FIRST_LAUNCH] = false
+        }
     }
 
     val dismissedUris: Flow<Set<String>> = context.dataStore.data

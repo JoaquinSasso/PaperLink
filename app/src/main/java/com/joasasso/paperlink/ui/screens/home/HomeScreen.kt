@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -68,6 +69,7 @@ import kotlinx.coroutines.flow.collectLatest
 fun HomeScreen(
     onNavigateToAdd: () -> Unit,
     onNavigateToTxtViewer: (String, String) -> Unit,
+    onNavigateToOnboarding: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -305,6 +307,20 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp)
         ) {
+            // Canal 0: Botón de Ayuda (Onboarding)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                IconButton(
+                    onClick = onNavigateToOnboarding,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.HelpOutline,
+                        contentDescription = "Help",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             // Canal 2: Banner Inteligente de Foto Reciente (Deslizable)
             if (uiState.recentPhotoUri != null) {
                 DismissiblePhotoBanner(

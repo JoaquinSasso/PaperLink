@@ -44,4 +44,21 @@
     <string name="txt_error_open">No se pudo abrir el archivo</string>
     <string name="txt_error_read">Error al leer el archivo: %1$s</string>
     <string name="txt_save_success">Cambios guardados con éxito</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_btn_skip">Saltar</string>
+    <string name="onboarding_btn_next">Siguiente</string>
+    <string name="onboarding_btn_finish">Empezar</string>
+
+    <string name="onboarding_title_page1">Bienvenido a PaperLink</string>
+    <string name="onboarding_desc_page1">¿Sacaste una foto al pizarrón y después no sabías de qué se trataba? PaperLink la vincula a tu cuaderno \n100% offline y privado.</string>
+
+    <string name="onboarding_title_page2">1. Captura o Vincula</string>
+    <string name="onboarding_desc_page2">Saca una foto rápida de la pizarra con la cámara o selecciona un PDF, video o enlace web desde el menú de agregar.</string>
+
+    <string name="onboarding_title_page3">2. Escribe el Código</string>
+    <string name="onboarding_desc_page3">La app generará un código único de 4 caracteres. Anótalo a mano en el margen de tu cuaderno.</string>
+
+    <string name="onboarding_title_page4">3. Abre al Instante</string>
+    <string name="onboarding_desc_page4">Cuando estés repasando y necesites el archivo, ingresá el código en PaperLink. ¡Tu documento se abre al instante.</string>
 </resources>

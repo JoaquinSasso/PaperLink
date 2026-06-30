@@ -6,11 +6,13 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.compose.rememberNavController
@@ -26,17 +28,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // El handleIntent DEBE ocurrir después de que Compose esté listo o asegurar que el ViewModel 
-        // mantenga el estado. Pero el log muestra que se llama bien.
-        // handleIntent(intent) // <--- Moveremos esto al final o lo dejaremos si el VM es compartido.
+        val userPreferencesRepository = (application as PaperLinkApp).container.userPreferencesRepository
 
         setContent {
+            val isFirstLaunch by userPreferencesRepository.isFirstLaunch.collectAsState(initial = null)
+
             PaperLinkTheme {
                 CompositionLocalProvider(
                     LocalViewModelStoreOwner provides this
                 ) {
-                    // Lanzamos el procesamiento del intent dentro del contexto de Compose
-                    // para asegurar que el ViewModelStoreOwner esté establecido y el VM sea el compartido.
                     LaunchedEffect(intent) {
                         handleIntent(intent)
                     }
@@ -45,12 +45,19 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        val navController = rememberNavController()
-                        // PASO CLAVE: Pasamos la instancia física 'homeViewModel' al NavHost
-                        PaperLinkNavNavHost(
-                            navController = navController,
-                            homeViewModel = homeViewModel
-                        )
+                        if (isFirstLaunch != null) {
+                            val navController = rememberNavController()
+                            PaperLinkNavNavHost(
+                                navController = navController,
+                                homeViewModel = homeViewModel,
+                                isFirstLaunch = isFirstLaunch!!
+                            )
+                        } else {
+                            // Carga inicial o splash
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
                 }
             }
