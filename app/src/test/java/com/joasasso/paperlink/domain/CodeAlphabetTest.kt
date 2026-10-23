@@ -8,55 +8,62 @@ import org.junit.Test
 class CodeAlphabetTest {
 
     @Test
-    fun alphabet_has32UniqueCharacters() {
+    fun alphabet_has26UniqueCharacters() {
         val chars = CodeAlphabet.ALLOWED_CHARACTERS
-        assertEquals(32, chars.length)
+        assertEquals(26, chars.length)
         assertEquals(chars.length, chars.toSet().size)
     }
 
     @Test
-    fun alphabet_excludesAmbiguousCharacters() {
-        for (c in "IO01") {
+    fun alphabet_excludesHandwritingConfusables() {
+        for (c in "IO01ZS2B58") {
             assertFalse("'$c' no debería estar en el alfabeto", c in CodeAlphabet.ALLOWED_CHARACTERS)
         }
     }
 
     @Test
+    fun alphabet_isUppercaseLettersAndDigitsOnly() {
+        assertTrue(CodeAlphabet.ALLOWED_CHARACTERS.all { it in 'A'..'Z' || it in '2'..'9' })
+    }
+
+    @Test
     fun isValid_acceptsWellFormedCodes() {
-        assertTrue(CodeAlphabet.isValid("HWQ2"))
-        assertTrue(CodeAlphabet.isValid("ABCD"))
-        assertTrue(CodeAlphabet.isValid("2345"))
+        assertTrue(CodeAlphabet.isValid("HWQ3"))
+        assertTrue(CodeAlphabet.isValid("ACDE"))
+        assertTrue(CodeAlphabet.isValid("3467"))
     }
 
     @Test
     fun isValid_rejectsWrongLength() {
         assertFalse(CodeAlphabet.isValid(""))
-        assertFalse(CodeAlphabet.isValid("ABC"))
-        assertFalse(CodeAlphabet.isValid("ABCDE"))
+        assertFalse(CodeAlphabet.isValid("ACD"))
+        assertFalse(CodeAlphabet.isValid("ACDEF"))
     }
 
     @Test
     fun isValid_rejectsCharactersOutsideAlphabet() {
-        assertFalse(CodeAlphabet.isValid("ABCI"))
-        assertFalse(CodeAlphabet.isValid("ABCO"))
-        assertFalse(CodeAlphabet.isValid("AB01"))
-        assertFalse(CodeAlphabet.isValid("AB-D"))
-        assertFalse(CodeAlphabet.isValid("AB D"))
+        assertFalse(CodeAlphabet.isValid("ACDI"))
+        assertFalse(CodeAlphabet.isValid("ACDO"))
+        assertFalse(CodeAlphabet.isValid("AC01"))
+        assertFalse(CodeAlphabet.isValid("HWQ2"))
+        assertFalse(CodeAlphabet.isValid("ZSB8"))
+        assertFalse(CodeAlphabet.isValid("AC-D"))
+        assertFalse(CodeAlphabet.isValid("AC D"))
     }
 
     @Test
     fun isValid_rejectsLowercase() {
-        assertFalse(CodeAlphabet.isValid("hwq2"))
+        assertFalse(CodeAlphabet.isValid("hwq3"))
     }
 
     @Test
     fun normalize_uppercasesAndTrims() {
-        assertEquals("HWQ2", CodeAlphabet.normalize("  hwq2 "))
-        assertEquals("HWQ2", CodeAlphabet.normalize("HWQ2"))
+        assertEquals("HWQ3", CodeAlphabet.normalize("  hwq3 "))
+        assertEquals("HWQ3", CodeAlphabet.normalize("HWQ3"))
     }
 
     @Test
     fun normalize_thenIsValid_acceptsLowercaseInput() {
-        assertTrue(CodeAlphabet.isValid(CodeAlphabet.normalize("hwq2")))
+        assertTrue(CodeAlphabet.isValid(CodeAlphabet.normalize("hwq3")))
     }
 }

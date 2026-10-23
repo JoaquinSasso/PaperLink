@@ -2,11 +2,13 @@ package com.joasasso.paperlink.domain
 
 /**
  * Define el alfabeto y las reglas de validación para los códigos de PaperLink.
- * * Alfabeto elegido: A-Z (sin I, O) + 2-9. Total: 32 caracteres.
- * Combinaciones posibles para 4 caracteres: 32^4 = 1.048.576.
+ *
+ * Alfabeto: A-Z + 2-9, sin los caracteres que se confunden al escribir a mano:
+ * I/1, O/0, Z/2, S/5 y B/8 (se excluyen ambos miembros de cada par). Total: 26 caracteres.
+ * Combinaciones posibles para 4 caracteres: 26^4 = 456.976.
  */
 object CodeAlphabet {
-    const val ALLOWED_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    const val ALLOWED_CHARACTERS = "ACDEFGHJKLMNPQRTUVWXY34679"
     const val CODE_LENGTH = 4
 
     // Límite de seguridad para evitar loops infinitos en caso de colisiones extremas.

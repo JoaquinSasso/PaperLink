@@ -28,7 +28,7 @@ PaperLink promete permanencia (un código escrito en papel dura años), pero la 
 ```kotlin
 @Entity(tableName = "links")
 data class Link(
-    @PrimaryKey val code: String,      // "HWQ2", siempre en mayúsculas
+    @PrimaryKey val code: String,      // "HWQ3", siempre en mayúsculas
     val label: String?,                // opcional
     val createdAt: Long,
     val updatedAt: Long,
@@ -60,8 +60,7 @@ data class Attachment(
 
 ## 4. Códigos
 
-- Alfabeto actual: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 caracteres, sin I/O/0/1).
-- **Decisión pendiente (confirmar con el usuario en la fase 1):** pasar a un alfabeto que además excluya pares confundibles a mano (`Z`/`2`, `S`/`5`, `B`/`8`) → 26 caracteres, unas 457.000 combinaciones. Como no hay datos viejos que conservar, validación y generación usan el mismo alfabeto.
+- Alfabeto: `ACDEFGHJKLMNPQRTUVWXY34679` (26 caracteres, 26⁴ = 456.976 combinaciones). Excluye ambos miembros de cada par confundible a mano: `I`/`1`, `O`/`0`, `Z`/`2`, `S`/`5`, `B`/`8`. Decidido el 23/10/2026 (antes eran 32 caracteres, sin I/O/0/1). Como no hay datos viejos que conservar, validación y generación usan el mismo alfabeto.
 - Al buscar un código inexistente, sugerir códigos existentes a distancia 1 (sustituciones de pares confundibles primero).
 
 ## 5. Componentes
@@ -151,7 +150,7 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 - **Notas:** `app/release/` no estaba en `.gitignore` pese a lo que decía el plan; se agregó. `app/schemas/` y `.github/modernize/` no estaban trackeados (solo se borraron del disco). El build regenera el esquema viejo `PaperLinkDatabase/2.json`; se borra a mano hasta la Fase 1, que arranca en la versión 3. Se agregó `CodeAlphabetTest` (8 tests) y se quitó `ExampleUnitTest`.
 
 ### Fase 1 — Base de datos y almacén
-- [ ] Confirmar la decisión del alfabeto (sección 4).
+- [x] Confirmar la decisión del alfabeto (sección 4): 26 caracteres, ya aplicado en `CodeAlphabet` con sus tests.
 - [ ] Entidades y DAO (uno alcanza), base versión 3 con el descarte de 1 y 2.
 - [ ] `AttachmentStore` con tests (import de imagen con re-codificación, archivo genérico, borrado).
 - [ ] `LinkRepository`.
@@ -201,3 +200,4 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 2026-10-23 | Se mantiene la apertura instantánea al cuarto carácter; sin confirmación previa | La velocidad de uso es prioritaria; el visor muestra el código para detectar errores |
 | 2026-10-23 | Balance simpleza / buenas prácticas: se mantienen capas, inyección y tests; se evita la indirección sin uso | Código simple pero mantenible y testeable |
 | 2026-10-23 | Se trabaja directo en `master`, sin ramas `rewrite/fase-N` | No interesa conservar una rama con la versión anterior |
+| 2026-10-23 | Alfabeto de 26 caracteres (sin I/1, O/0, Z/2, S/5, B/8) | Menos errores al leer códigos escritos a mano; 456.976 combinaciones sobran para una persona |
