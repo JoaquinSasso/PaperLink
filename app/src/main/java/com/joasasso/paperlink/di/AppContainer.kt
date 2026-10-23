@@ -1,39 +1,36 @@
 package com.joasasso.paperlink.di
 
 import android.content.Context
+import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
-import com.joasasso.paperlink.data.repository.PaperLinkRepository
-import com.joasasso.paperlink.domain.GenerateCodeUseCase
-
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
+import com.joasasso.paperlink.data.repository.LinkRepository
+import com.joasasso.paperlink.util.log
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
- * Contenedor de dependencias principal de la aplicación.
+ * Contenedor de dependencias de la aplicación (DI manual).
  */
-interface AppContainer {
-    val paperLinkRepository: PaperLinkRepository
-    val generateCodeUseCase: GenerateCodeUseCase
-    val userPreferencesRepository: UserPreferencesRepository
-}
+class AppContainer(context: Context) {
 
-/**
- * Implementación por defecto del [AppContainer].
- */
-class DefaultAppContainer(private val context: Context) : AppContainer {
+    /** Trabajo que debe sobrevivir a las pantallas: mantenimiento y purgas diferidas. */
+    val applicationScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, e -> log("Background task failed", e) }
+    )
 
-    private val database: PaperLinkDatabase by lazy {
-        PaperLinkDatabase.build(context)
+    private val database: PaperLinkDatabase by lazy { PaperLinkDatabase.build(context) }
+
+    private val attachmentStore: AttachmentStore by lazy { AttachmentStore(context) }
+
+    val linkRepository: LinkRepository by lazy {
+        LinkRepository(database.linkDao(), attachmentStore, applicationScope)
     }
 
-    override val paperLinkRepository: PaperLinkRepository by lazy {
-        PaperLinkRepository(database.paperLinkDao())
-    }
-
-    override val generateCodeUseCase: GenerateCodeUseCase by lazy {
-        GenerateCodeUseCase(paperLinkRepository)
-    }
-
-    override val userPreferencesRepository: UserPreferencesRepository by lazy {
+    val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context)
     }
 }

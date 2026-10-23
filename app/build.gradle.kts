@@ -43,6 +43,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -52,13 +53,13 @@ android {
     }
 }
 
-// Schemas de Room exportados para versionar migraciones a futuro
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
+// Schemas de Room exportados y versionados en git (base de migraciones futuras)
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.generateKotlin", "true")
@@ -89,7 +90,10 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // DataStore (preparado para configuración futura)
+    // Orientación EXIF al re-codificar fotos
+    implementation(libs.androidx.exifinterface)
+
+    // DataStore
     implementation(libs.androidx.datastore.preferences)
 
     // Coil 3 para imágenes y video
@@ -104,6 +108,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)

@@ -1,5 +1,7 @@
 package com.joasasso.paperlink.domain
 
+import kotlin.random.Random
+
 /**
  * Define el alfabeto y las reglas de validación para los códigos de PaperLink.
  *
@@ -13,6 +15,13 @@ object CodeAlphabet {
 
     // Límite de seguridad para evitar loops infinitos en caso de colisiones extremas.
     const val MAX_RETRIES = 10
+
+    /**
+     * Genera un código al azar. No verifica unicidad: quien lo inserta debe reintentar
+     * con otro si choca la clave primaria.
+     */
+    fun generate(random: Random = Random.Default): String =
+        String(CharArray(CODE_LENGTH) { ALLOWED_CHARACTERS[random.nextInt(ALLOWED_CHARACTERS.length)] })
 
     /**
      * Valida si un string cumple con el formato exacto de un código PaperLink.

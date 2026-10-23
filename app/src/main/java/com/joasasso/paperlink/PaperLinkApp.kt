@@ -6,17 +6,14 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.video.VideoFrameDecoder
 import com.joasasso.paperlink.di.AppContainer
-import com.joasasso.paperlink.di.DefaultAppContainer
 import com.joasasso.paperlink.util.PdfDecoder
+import kotlinx.coroutines.launch
 
 /**
  * Application class de PaperLink.
  *
- * Mantiene una instancia única de [AppContainer] accesible desde toda la app.
- * Los ViewModels la obtienen así (Fase 5):
- *
- *     val app = LocalContext.current.applicationContext as PaperLinkApp
- *     val repo = app.container.paperLinkRepository
+ * Mantiene una instancia única de [AppContainer] accesible desde toda la app; los ViewModels
+ * la obtienen desde su Factory (`APPLICATION_KEY`).
  *
  * `container` es `lateinit` y no `by lazy` adrede: queremos que se inicialice
  * en `onCreate` y falle ruidosamente si algo se accede antes (lo cual sería un bug).
@@ -28,7 +25,9 @@ class PaperLinkApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        container = DefaultAppContainer(this)
+        container = AppContainer(this)
+        // Purga de borrados vencidos y barrido de huérfanos, en segundo plano.
+        container.applicationScope.launch { container.linkRepository.runMaintenance() }
     }
 
     override fun newImageLoader(context: android.content.Context): ImageLoader {

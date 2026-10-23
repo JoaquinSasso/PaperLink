@@ -61,4 +61,11 @@
 
     <string name="onboarding_title_page4">3. Abre al Instante</string>
     <string name="onboarding_desc_page4">Cuando estés repasando y necesites el archivo, ingresá el código en PaperLink. ¡Tu documento se abre al instante!</string>
+
+    <!-- Home temporal (reescritura) -->
+    <string name="home_rewrite_notice">Reescritura en curso. Pronto vuelven la captura y la búsqueda de códigos.</string>
+    <plurals name="home_link_count">
+        <item quantity="one">%d código guardado</item>
+        <item quantity="other">%d códigos guardados</item>
+    </plurals>
 </resources>

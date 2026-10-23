@@ -4,35 +4,26 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
 
 /**
- * Base de datos radical de PaperLink.
- * PIVOTE: Se elimina la tabla de Subjects para un diseño de Fricción Cero.
+ * Base de PaperLink. Arranca en la versión 3: las versiones 1 y 2 (app anterior) se descartan
+ * sin migrar. De la 3 en adelante cada cambio de esquema lleva una Migration con su test;
+ * nunca `fallbackToDestructiveMigration()`.
  */
 @Database(
-    entities = [PaperLink::class],
-    version = 2, // Incrementamos para forzar la migración destructiva
-    exportSchema = true
+    entities = [Link::class, Attachment::class],
+    version = 3,
+    exportSchema = true,
 )
-@TypeConverters(ContentTypeConverter::class)
 abstract class PaperLinkDatabase : RoomDatabase() {
-    abstract fun paperLinkDao(): PaperLinkDao
+    abstract fun linkDao(): LinkDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: PaperLinkDatabase? = null
-        fun build(context: Context): PaperLinkDatabase {
-            return INSTANCE ?: synchronized(this) {
-                Room.databaseBuilder(
-                    context,
-                    PaperLinkDatabase::class.java,
-                    "paperlink.db"
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
-                    .also { INSTANCE = it }
-            }
-        }
+        const val NAME = "paperlink.db"
+
+        fun build(context: Context, name: String = NAME): PaperLinkDatabase =
+            Room.databaseBuilder(context, PaperLinkDatabase::class.java, name)
+                .fallbackToDestructiveMigrationFrom(true, 1, 2)
+                .build()
     }
 }

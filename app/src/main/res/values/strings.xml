@@ -61,4 +61,11 @@
 
     <string name="onboarding_title_page4">3. Open Instantly</string>
     <string name="onboarding_desc_page4">Whenever you review your notes and need the file, enter the code in PaperLink. Your digital document opens in a flash!</string>
+
+    <!-- Home temporal (reescritura) -->
+    <string name="home_rewrite_notice">Rewrite in progress. Capturing and finding codes will be back soon.</string>
+    <plurals name="home_link_count">
+        <item quantity="one">%d code saved</item>
+        <item quantity="other">%d codes saved</item>
+    </plurals>
 </resources>
