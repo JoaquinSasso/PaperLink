@@ -135,6 +135,25 @@ class LinkRepositoryTest {
         assertTrue(dir.mediaFiles().isEmpty())
     }
 
+    @Test
+    fun storedFiles_areLinkedWithoutCopyingAgainAndSurviveFailures() = runBlocking {
+        val repo = repository()
+        val stored = store.import(dir.source("shared.pdf", byteArrayOf(1, 2, 3)))
+
+        // Falla (código inexistente): el archivo ya copiado no se borra, para reintentar.
+        try {
+            repo.addAttachments("ACDE", listOf(AttachmentSource.Stored(stored)))
+            fail("Expected LinkNotFoundException")
+        } catch (_: LinkNotFoundException) {
+            // esperado
+        }
+        assertEquals(1, dir.mediaFiles().size)
+
+        val code = repo.createLink(listOf(AttachmentSource.Stored(stored)))
+        assertEquals(stored.relativePath, repo.getLink(code)!!.attachments.single().relativePath)
+        assertEquals(1, dir.mediaFiles().size)
+    }
+
     // --- Agregar y etiquetar ---
 
     @Test

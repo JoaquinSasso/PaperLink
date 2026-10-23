@@ -222,6 +222,22 @@ class AttachmentStoreTest {
         assertTrue(recentPart.exists())
     }
 
+    @Test
+    fun sweep_keepsRecentCapturesAndRemovesAbandonedOnes() = runBlocking {
+        val now = System.currentTimeMillis()
+        val recent = store.newCaptureFile().apply { writeBytes(byteArrayOf(1)) }
+        val abandoned = store.newCaptureFile().apply {
+            writeBytes(byteArrayOf(1))
+            setLastModified(now - AttachmentStore.CAPTURE_MAX_AGE_MS - 1)
+        }
+
+        store.sweep(emptySet(), now)
+
+        assertTrue(recent.exists())
+        assertFalse(abandoned.exists())
+        assertEquals(recent, store.captureFile(recent.name))
+    }
+
     // --- Helpers ---
 
     private fun decodeBounds(file: File) =
