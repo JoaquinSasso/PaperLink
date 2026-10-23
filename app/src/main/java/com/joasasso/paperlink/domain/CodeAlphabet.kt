@@ -32,6 +32,14 @@ object CodeAlphabet {
     }
 
     /**
+     * Limpia lo que el usuario escribe o pega en el campo de código: mayúsculas, solo letras y
+     * dígitos ASCII, a lo sumo [CODE_LENGTH]. Deja pasar caracteres fuera del alfabeto (O, 1…)
+     * para poder avisar del error y sugerir códigos parecidos.
+     */
+    fun sanitizeInput(raw: String): String =
+        raw.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }.take(CODE_LENGTH)
+
+    /**
      * Normaliza un input de búsqueda ingresado por el usuario.
      */
     fun normalize(input: String): String {

@@ -56,8 +56,9 @@ class PdfDecoder(
                     isSampled = false
                 )
             }
-        } catch (_: Exception) {
-            // Si falla, ThumbnailImage usará el fallback del gradiente
+        } catch (e: Exception) {
+            // Sin miniatura: la UI muestra el ícono del tipo de archivo.
+            log("PDF thumbnail failed", e)
         } finally {
             renderer?.close()
             pfd?.close()

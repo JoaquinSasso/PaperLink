@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [Link::class, Attachment::class],
-    version = 3,
+    version = PaperLinkDatabase.VERSION,
     exportSchema = true,
 )
 abstract class PaperLinkDatabase : RoomDatabase() {
@@ -20,10 +20,12 @@ abstract class PaperLinkDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "paperlink.db"
+        const val VERSION = 4
 
         fun build(context: Context, name: String = NAME): PaperLinkDatabase =
             Room.databaseBuilder(context, PaperLinkDatabase::class.java, name)
                 .fallbackToDestructiveMigrationFrom(true, 1, 2)
+                .addMigrations(MIGRATION_3_4)
                 .build()
     }
 }

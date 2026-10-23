@@ -8,7 +8,8 @@ import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Acceso a [Link] y [Attachment]. Todas las lecturas excluyen los códigos con borrado lógico.
+ * Acceso a [Link] y [Attachment]. Las lecturas excluyen los códigos con borrado lógico; los
+ * attachments borrados se filtran en el repositorio (`@Relation` no admite condiciones).
  */
 @Dao
 interface LinkDao {
@@ -99,17 +100,6 @@ interface LinkDao {
     @Query("SELECT * FROM links WHERE deletedAt IS NULL ORDER BY updatedAt DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<LinkWithAttachments>>
 
-    /** [pattern] ya viene con comodines y escapado con '\'. */
-    @Transaction
-    @Query(
-        """
-        SELECT * FROM links
-        WHERE deletedAt IS NULL AND label LIKE :pattern ESCAPE '\'
-        ORDER BY updatedAt DESC
-        """
-    )
-    fun searchByLabel(pattern: String): Flow<List<LinkWithAttachments>>
-
     @Query("SELECT code FROM links WHERE deletedAt IS NULL ORDER BY createdAt DESC LIMIT 1")
     fun observeLastCreatedCode(): Flow<String?>
 
@@ -119,4 +109,33 @@ interface LinkDao {
     /** Todas las rutas referenciadas, incluidas las de códigos borrados aún no purgados. */
     @Query("SELECT relativePath FROM attachments WHERE relativePath IS NOT NULL")
     suspend fun allFilePaths(): List<String>
+
+    @Query("SELECT code FROM links WHERE deletedAt IS NULL")
+    suspend fun allCodes(): List<String>
+
+    /** Códigos con etiqueta; el filtro (sin tildes ni mayúsculas) se hace en Kotlin. */
+    @Transaction
+    @Query("SELECT * FROM links WHERE deletedAt IS NULL AND label IS NOT NULL ORDER BY updatedAt DESC")
+    fun observeLabeled(): Flow<List<LinkWithAttachments>>
+
+    // --- Elementos sueltos ---
+
+    @Query("UPDATE attachments SET deletedAt = :now WHERE id = :id AND deletedAt IS NULL")
+    suspend fun softDeleteAttachment(id: String, now: Long): Int
+
+    @Query("UPDATE attachments SET deletedAt = NULL WHERE id = :id AND deletedAt IS NOT NULL")
+    suspend fun restoreAttachment(id: String): Int
+
+    @Query("SELECT relativePath FROM attachments WHERE deletedAt IS NOT NULL AND deletedAt <= :cutoff AND relativePath IS NOT NULL")
+    suspend fun filesOfAttachmentsDeletedBefore(cutoff: Long): List<String>
+
+    @Query("DELETE FROM attachments WHERE deletedAt IS NOT NULL AND deletedAt <= :cutoff")
+    suspend fun deleteAttachmentsDeletedBefore(cutoff: Long): Int
+
+    @Transaction
+    suspend fun purgeAttachmentsDeletedBefore(cutoff: Long): List<String> {
+        val paths = filesOfAttachmentsDeletedBefore(cutoff)
+        deleteAttachmentsDeletedBefore(cutoff)
+        return paths
+    }
 }

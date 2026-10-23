@@ -29,6 +29,9 @@ data class Link(
  *
  * Según [kind] se usa un solo campo de contenido: [relativePath] para archivos
  * (`media/<uuid>.<ext>` dentro de `filesDir`), [url] para links web y [text] para notas.
+ *
+ * [deletedAt]: borrado lógico de un elemento suelto (versión 4), con la misma ventana de
+ * deshacer que los códigos.
  */
 @Entity(
     tableName = "attachments",
@@ -54,6 +57,7 @@ data class Attachment(
     val sha256: String?,
     val position: Int,
     val createdAt: Long,
+    val deletedAt: Long? = null,
 ) {
     enum class Kind { IMAGE, VIDEO, AUDIO, PDF, FILE, URL, NOTE }
 }

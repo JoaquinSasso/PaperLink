@@ -7,14 +7,18 @@ import com.joasasso.paperlink.data.local.Link
 import com.joasasso.paperlink.data.local.LinkDao
 import com.joasasso.paperlink.data.local.LinkWithAttachments
 import com.joasasso.paperlink.domain.CodeAlphabet
+import com.joasasso.paperlink.domain.labelMatches
 import com.joasasso.paperlink.util.log
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 import kotlin.random.Random
 
@@ -34,6 +38,9 @@ sealed interface AttachmentSource {
 
 /** Progreso de importación: archivo [fileIndex] de [fileCount] (solo cuentan los [AttachmentSource.Content]). */
 data class ImportProgress(val fileIndex: Int, val fileCount: Int, val copiedBytes: Long, val totalBytes: Long?)
+
+/** Un código listo para mostrar: sus elementos y cuáles faltan en disco. */
+data class LinkContent(val link: LinkWithAttachments, val unavailableIds: Set<String>)
 
 class LinkNotFoundException(code: String) : NoSuchElementException("Link $code not found")
 
@@ -57,16 +64,42 @@ class LinkRepository(
     // --- Lectura ---
 
     fun observeLink(code: String): Flow<LinkWithAttachments?> =
-        dao.observeLink(CodeAlphabet.normalize(code)).map { it?.ordered() }
+        dao.observeLink(CodeAlphabet.normalize(code)).map { it?.visible() }
 
     suspend fun getLink(code: String): LinkWithAttachments? =
-        dao.getLink(CodeAlphabet.normalize(code))?.ordered()
+        dao.getLink(CodeAlphabet.normalize(code))?.visible()
 
     fun observeRecent(limit: Int = RECENT_LIMIT): Flow<List<LinkWithAttachments>> =
-        dao.observeRecent(limit).map { list -> list.map { it.ordered() } }
+        dao.observeRecent(limit).map { list -> list.map { it.visible() } }
 
+    /** Códigos cuya etiqueta contiene [query], sin distinguir tildes ni mayúsculas. */
     fun searchByLabel(query: String): Flow<List<LinkWithAttachments>> =
-        dao.searchByLabel("%${query.trim().escapeLike()}%").map { list -> list.map { it.ordered() } }
+        dao.observeLabeled().map { list ->
+            list.filter { labelMatches(it.link.label, query) }.map { it.visible() }
+        }
+
+    /** Todos los códigos vigentes (para sugerir parecidos cuando uno no existe). */
+    suspend fun allCodes(): List<String> = dao.allCodes()
+
+    /** Archivo de un attachment (null si no es un archivo). Solo arma la ruta: no toca el disco. */
+    fun fileFor(attachment: Attachment): File? = attachment.relativePath?.let(store::fileFor)
+
+    /** URI para abrir el archivo con otra app (vía FileProvider). */
+    fun uriFor(attachment: Attachment): Uri? = attachment.relativePath?.let(store::uriFor)
+
+    /** false si el attachment es un archivo que ya no está en disco. */
+    suspend fun isAvailable(attachment: Attachment): Boolean =
+        attachment.relativePath?.let { store.exists(it) } ?: true
+
+    /**
+     * El código con sus elementos y los ids de los que faltan en disco (se muestran como
+     * "archivo no disponible" sin ocultar el código). null si el código no existe.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeLinkContent(code: String): Flow<LinkContent?> =
+        observeLink(code).mapLatest { link ->
+            link?.let { LinkContent(it, it.attachments.filterNot { a -> isAvailable(a) }.map { a -> a.id }.toSet()) }
+        }
 
     fun observeCount(): Flow<Int> = dao.observeCount()
 
@@ -144,10 +177,26 @@ class LinkRepository(
     /** @return false si ya se purgó o no estaba borrado. */
     suspend fun undoDelete(code: String): Boolean = dao.restore(CodeAlphabet.normalize(code)) > 0
 
-    /** Elimina físicamente los códigos borrados hace más de [UNDO_WINDOW_MS]. */
+    /**
+     * Borrado lógico de un elemento suelto, con la misma ventana de deshacer que los códigos.
+     * @return false si no existía o ya estaba borrado.
+     */
+    suspend fun deleteAttachment(id: String): Boolean {
+        if (dao.softDeleteAttachment(id, clock()) == 0) return false
+        externalScope.launch {
+            delay(UNDO_WINDOW_MS)
+            purgeExpired()
+        }
+        return true
+    }
+
+    /** @return false si ya se purgó o no estaba borrado. */
+    suspend fun undoDeleteAttachment(id: String): Boolean = dao.restoreAttachment(id) > 0
+
+    /** Elimina físicamente códigos y elementos borrados hace más de [UNDO_WINDOW_MS]. */
     suspend fun purgeExpired() {
-        val paths = dao.purgeDeletedBefore(clock() - UNDO_WINDOW_MS)
-        deleteFiles(paths)
+        val cutoff = clock() - UNDO_WINDOW_MS
+        deleteFiles(dao.purgeDeletedBefore(cutoff) + dao.purgeAttachmentsDeletedBefore(cutoff))
     }
 
     /**
@@ -244,9 +293,8 @@ class LinkRepository(
     }
 }
 
-private fun LinkWithAttachments.ordered() = copy(attachments = attachments.sortedBy { it.position })
+/** Sin los attachments borrados y en orden. */
+private fun LinkWithAttachments.visible() =
+    copy(attachments = attachments.filter { it.deletedAt == null }.sortedBy { it.position })
 
 private fun String?.normalizeLabel(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
-
-private fun String.escapeLike(): String =
-    replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

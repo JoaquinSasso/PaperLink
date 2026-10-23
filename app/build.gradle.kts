@@ -46,6 +46,11 @@ android {
         buildConfig = true
     }
 
+    // Los esquemas exportados son la referencia de los tests de migración.
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -106,6 +111,9 @@ dependencies {
     implementation(libs.coil.video)
     implementation(libs.coil.network.okhttp)
 
+    // Zoom del visor de imágenes
+    implementation(libs.telephoto.zoomable.image.coil3)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
@@ -114,6 +122,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)

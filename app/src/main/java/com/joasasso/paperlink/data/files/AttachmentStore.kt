@@ -134,10 +134,13 @@ class AttachmentStore(
         fileFor(relativePath).isFile
     }
 
+    /** Archivo de una ruta relativa de `media/`. Solo valida el texto de la ruta: no toca el disco. */
     fun fileFor(relativePath: String): File {
-        val file = File(mediaDir.parentFile, relativePath)
-        require(file.parentFile?.canonicalPath == mediaDir.canonicalPath) { "Not a media path: $relativePath" }
-        return file
+        val name = relativePath.removePrefix("$MEDIA_DIR/")
+        require(name != relativePath && name.isNotEmpty() && name != ".." && name.none { it == '/' || it == '\\' }) {
+            "Not a media path: $relativePath"
+        }
+        return File(mediaDir, name)
     }
 
     fun uriFor(relativePath: String): Uri =
