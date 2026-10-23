@@ -24,7 +24,7 @@ class AppContainer(context: Context) {
 
     private val database: PaperLinkDatabase by lazy { PaperLinkDatabase.build(context) }
 
-    private val attachmentStore: AttachmentStore by lazy { AttachmentStore(context) }
+    val attachmentStore: AttachmentStore by lazy { AttachmentStore(context) }
 
     val linkRepository: LinkRepository by lazy {
         LinkRepository(database.linkDao(), attachmentStore, applicationScope)

@@ -110,6 +110,9 @@ interface LinkDao {
     )
     fun searchByLabel(pattern: String): Flow<List<LinkWithAttachments>>
 
+    @Query("SELECT code FROM links WHERE deletedAt IS NULL ORDER BY createdAt DESC LIMIT 1")
+    fun observeLastCreatedCode(): Flow<String?>
+
     @Query("SELECT COUNT(*) FROM links WHERE deletedAt IS NULL")
     fun observeCount(): Flow<Int>
 

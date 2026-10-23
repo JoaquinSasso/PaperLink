@@ -22,6 +22,12 @@ import kotlin.random.Random
 sealed interface AttachmentSource {
     /** Archivo de cámara, galería, compartir o selector: se copia a `media/`. */
     data class Content(val uri: Uri) : AttachmentSource
+
+    /**
+     * Archivo ya copiado a `media/` (por ejemplo, al recibir algo compartido). Es de quien lo
+     * importó: si la operación falla no se borra, para poder reintentar con otro destino.
+     */
+    data class Stored(val file: AttachmentStore.ImportResult) : AttachmentSource
     data class WebUrl(val url: String) : AttachmentSource
     data class Note(val text: String) : AttachmentSource
 }
@@ -64,6 +70,8 @@ class LinkRepository(
 
     fun observeCount(): Flow<Int> = dao.observeCount()
 
+    fun observeLastCreatedCode(): Flow<String?> = dao.observeLastCreatedCode()
+
     // --- Escritura ---
 
     /**
@@ -84,13 +92,13 @@ class LinkRepository(
             repeat(CodeAlphabet.MAX_RETRIES) {
                 val code = CodeAlphabet.generate(random)
                 val link = Link(code, label.normalizeLabel(), createdAt = now, updatedAt = now, deletedAt = null)
-                val attachments = prepared.mapIndexed { i, a -> a.copy(linkCode = code, position = i) }
+                val attachments = prepared.attachments.mapIndexed { i, a -> a.copy(linkCode = code, position = i) }
                 if (dao.insertLinkWithAttachments(link, attachments)) return code
                 log("Code collision, retrying")
             }
             throw CodeSpaceExhaustedException()
         } catch (t: Throwable) {
-            discardFiles(prepared)
+            discardFiles(prepared.importedPaths)
             throw t
         }
     }
@@ -106,9 +114,9 @@ class LinkRepository(
         val now = clock()
         val prepared = prepare(sources, now, onProgress)
         try {
-            if (!dao.appendAttachments(normalized, prepared, now)) throw LinkNotFoundException(normalized)
+            if (!dao.appendAttachments(normalized, prepared.attachments, now)) throw LinkNotFoundException(normalized)
         } catch (t: Throwable) {
-            discardFiles(prepared)
+            discardFiles(prepared.importedPaths)
             throw t
         }
     }
@@ -154,46 +162,55 @@ class LinkRepository(
 
     // --- Internos ---
 
+    /** Attachments listos para insertar y las rutas copiadas en esta llamada (para limpiar si falla). */
+    private class Prepared(val attachments: List<Attachment>, val importedPaths: List<String>)
+
     /** Valida todo antes de copiar y luego importa los archivos. Si algo falla, no deja archivos. */
     private suspend fun prepare(
         sources: List<AttachmentSource>,
         now: Long,
         onProgress: (ImportProgress) -> Unit,
-    ): List<Attachment> {
+    ): Prepared {
         for (source in sources) {
             when (source) {
                 is AttachmentSource.WebUrl -> require(source.url.isNotBlank()) { "Empty URL" }
                 is AttachmentSource.Note -> require(source.text.isNotBlank()) { "Empty note" }
-                is AttachmentSource.Content -> Unit
+                is AttachmentSource.Content, is AttachmentSource.Stored -> Unit
             }
         }
         val fileCount = sources.count { it is AttachmentSource.Content }
-        val prepared = mutableListOf<Attachment>()
+        val attachments = mutableListOf<Attachment>()
+        val imported = mutableListOf<String>()
         try {
             for (source in sources) {
-                prepared += when (source) {
+                attachments += when (source) {
                     is AttachmentSource.Content -> {
-                        val index = prepared.count { it.relativePath != null }
+                        val index = imported.size
                         val result = store.import(source.uri) { copied, total ->
                             onProgress(ImportProgress(index, fileCount, copied, total))
                         }
-                        newAttachment(now, result.kind).copy(
-                            relativePath = result.relativePath,
-                            mimeType = result.mimeType,
-                            sizeBytes = result.sizeBytes,
-                            sha256 = result.sha256,
-                        )
+                        imported += result.relativePath
+                        fileAttachment(now, result)
                     }
+                    is AttachmentSource.Stored -> fileAttachment(now, source.file)
                     is AttachmentSource.WebUrl -> newAttachment(now, Attachment.Kind.URL).copy(url = source.url.trim())
                     is AttachmentSource.Note -> newAttachment(now, Attachment.Kind.NOTE).copy(text = source.text.trim())
                 }
             }
         } catch (t: Throwable) {
-            discardFiles(prepared)
+            discardFiles(imported)
             throw t
         }
-        return prepared
+        return Prepared(attachments, imported)
     }
+
+    private fun fileAttachment(now: Long, file: AttachmentStore.ImportResult) =
+        newAttachment(now, file.kind).copy(
+            relativePath = file.relativePath,
+            mimeType = file.mimeType,
+            sizeBytes = file.sizeBytes,
+            sha256 = file.sha256,
+        )
 
     private fun newAttachment(now: Long, kind: Attachment.Kind) = Attachment(
         id = UUID.randomUUID().toString(),
@@ -209,9 +226,9 @@ class LinkRepository(
         createdAt = now,
     )
 
-    /** Borra los archivos de attachments que no llegaron a la base. Corre aunque se haya cancelado. */
-    private suspend fun discardFiles(attachments: List<Attachment>) {
-        withContext(NonCancellable) { deleteFiles(attachments.mapNotNull { it.relativePath }) }
+    /** Borra archivos copiados que no llegaron a la base. Corre aunque se haya cancelado. */
+    private suspend fun discardFiles(paths: List<String>) {
+        withContext(NonCancellable) { deleteFiles(paths) }
     }
 
     /** Si un archivo no se puede borrar, el barrido de huérfanos lo reintenta en el próximo arranque. */

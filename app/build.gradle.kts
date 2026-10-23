@@ -90,6 +90,11 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // CameraX (cámara propia con captura de varias fotos)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.compose)
+
     // Orientación EXIF al re-codificar fotos
     implementation(libs.androidx.exifinterface)
 

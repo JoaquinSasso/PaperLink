@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -47,6 +48,10 @@ class AttachmentStore(
 ) {
     private val mediaDir = File(baseDir, MEDIA_DIR)
 
+    /** Fotos recién sacadas por la cámara, antes de importarse. Fuera de `media/` y del barrido rápido. */
+    private val capturesDir = File(baseDir, CAPTURES_DIR)
+
+    @Serializable
     data class ImportResult(
         val relativePath: String,
         val kind: Attachment.Kind,
@@ -100,6 +105,25 @@ class AttachmentStore(
         }
     }
 
+    /** Archivo nuevo donde la cámara escribe una foto; se importa con [import] y se borra con [deleteCapture]. */
+    suspend fun newCaptureFile(): File = withContext(ioDispatcher) {
+        if (!capturesDir.isDirectory && !capturesDir.mkdirs()) throw IOException("Cannot create $capturesDir")
+        File(capturesDir, "${UUID.randomUUID()}.jpg")
+    }
+
+    /** Archivo de captura por nombre (para retomar una sesión tras la muerte del proceso). */
+    fun captureFile(name: String): File {
+        val file = File(capturesDir, name)
+        require(file.parentFile?.canonicalPath == capturesDir.canonicalPath) { "Not a capture: $name" }
+        return file
+    }
+
+    suspend fun captureExists(file: File): Boolean = withContext(ioDispatcher) { file.isFile && file.length() > 0 }
+
+    suspend fun deleteCapture(file: File): Boolean = withContext(ioDispatcher) {
+        !file.exists() || file.delete()
+    }
+
     /** Borra el archivo. Devuelve true si ya no existe. */
     suspend fun delete(relativePath: String): Boolean = withContext(ioDispatcher) {
         val file = fileFor(relativePath)
@@ -127,13 +151,16 @@ class AttachmentStore(
      * @return cantidad de archivos borrados.
      */
     suspend fun sweep(referencedPaths: Set<String>, now: Long): Int = withContext(ioDispatcher) {
-        val files = mediaDir.listFiles() ?: return@withContext 0
         var deleted = 0
-        for (file in files) {
+        for (file in mediaDir.listFiles().orEmpty()) {
             if (!file.isFile || now - file.lastModified() < SWEEP_MIN_AGE_MS) continue
             val orphan = file.name.endsWith(PART_SUFFIX) || "$MEDIA_DIR/${file.name}" !in referencedPaths
             if (!orphan) continue
             if (file.delete()) deleted++ else log("Sweep could not delete ${file.name}")
+        }
+        // Capturas de sesiones de cámara abandonadas hace mucho.
+        for (file in capturesDir.listFiles().orEmpty()) {
+            if (now - file.lastModified() >= CAPTURE_MAX_AGE_MS && file.delete()) deleted++
         }
         deleted
     }
@@ -292,6 +319,8 @@ class AttachmentStore(
 
     companion object {
         const val MEDIA_DIR = "media"
+        const val CAPTURES_DIR = "captures"
+        const val CAPTURE_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         const val PART_SUFFIX = ".part"
         const val IMAGE_MAX_SIDE_PX = 3000
         const val JPEG_QUALITY = 85
