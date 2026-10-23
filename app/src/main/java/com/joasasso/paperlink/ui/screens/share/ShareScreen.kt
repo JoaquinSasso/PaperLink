@@ -117,6 +117,7 @@ fun ShareScreen(
                     } else {
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
+                    OutlinedButton(onClick = viewModel::cancel) { Text(stringResource(R.string.action_cancel)) }
                 }
                 ShareViewModel.Phase.Ready, ShareViewModel.Phase.Saving -> {
                     val enabled = phase == ShareViewModel.Phase.Ready

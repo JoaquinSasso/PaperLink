@@ -170,12 +170,22 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
   - Pendiente de la matriz: probar una foto HEIC real y un video de más de 1 GB (fase 2, con la cámara y el compartir).
 
 ### Fase 2 — Captura
-- [ ] Pantalla de cámara con CameraX, multi-foto, permiso pedido en el momento.
-- [ ] Pantalla del código.
-- [ ] Widget y atajo del ícono que abren la cámara directo.
-- [ ] Recepción de `SEND` / `SEND_MULTIPLE` con elección de código nuevo o existente.
-- [ ] Agregar desde la app: Photo Picker, documentos, URL, nota.
+- [x] Pantalla de cámara con CameraX, multi-foto, permiso pedido en el momento.
+- [x] Pantalla del código.
+- [x] Widget y atajo del ícono que abren la cámara directo.
+- [x] Recepción de `SEND` / `SEND_MULTIPLE` con elección de código nuevo o existente.
+- [x] Agregar desde la app: Photo Picker, documentos, URL, nota.
 - **Criterio (en dispositivo):** sacar 3 fotos, ver el código, cerrar la app; activar "No conservar actividades" en opciones de desarrollador y repetir sin perder fotos; compartir un link de YouTube y 2 fotos desde Google Fotos.
+- **Verificación (23/10/2026, Pixel 8, API 37, con "No conservar actividades" activado):** 3 fotos en ráfaga → un código con 3 fotos. Proceso matado a mitad de sesión (2 fotos) → al volver la cámara retoma con 2 y el código termina con 3. Link de YouTube compartido y agregado a un código existente; "Listo" vuelve a la app de origen. 2 fotos compartidas desde Google Fotos, widget y atajo del ícono: OK (probado por el usuario). Video de 150 MB por compartir: OK. 21 unit tests y 44 instrumentados en verde; sin errores en logcat.
+- **Notas y decisiones:**
+  - Las fotos de la cámara se escriben en `filesDir/captures/` (fuera de `media/` y del barrido de 1 h) y se importan con `AttachmentStore` (re-codificación incluida). Las capturas de sesiones abandonadas se borran a los 7 días. El guardado corre en el `applicationScope`, así que salir de la cámara no lo cancela; "atrás" con fotos equivale a "Listo" para que el código siempre se muestre.
+  - Lo compartido se copia a `media/` al llegar y se vincula con `AttachmentSource.Stored` (no se copia dos veces y no se borra si falla, para reintentar con otro código). Si el usuario sale sin elegir destino, el barrido lo borra pasada 1 h; con "Cancelar" se borra en el momento y se frena la copia en curso.
+  - Texto compartido: si tiene links http(s), se guarda cada uno como link; si no, como nota.
+  - Compartir y la cámara desde el widget/atajo reemplazan toda la pila de navegación; al terminar de compartir, "Listo" cierra la app y vuelve a la de origen. Compartir no pasa por el onboarding.
+  - El atajo del ícono es dinámico (`ShortcutManagerCompat`), porque uno estático no admite el sufijo `.debug` del paquete.
+  - Lo elegido desde la app (Photo Picker, documentos) se copia al elegirlo; si el proceso muere a mitad de la copia, hay que volver a elegirlo.
+  - Corregido tras la prueba manual: al compartir no había botón "Cancelar" durante la copia y la X no frenaba la copia en curso.
+  - Pendiente de la matriz: foto HEIC y video de más de 1 GB (el usuario no tenía archivos así); queda para la fase 5.
 
 ### Fase 3 — Recuperación
 - [ ] Home nueva: campo de código accesible (TalkBack, pegar), recientes, búsqueda por etiqueta, estado vacío.
@@ -214,3 +224,5 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 2026-10-23 | Alfabeto de 26 caracteres (sin I/1, O/0, Z/2, S/5, B/8) | Menos errores al leer códigos escritos a mano; 456.976 combinaciones sobran para una persona |
 | 2026-10-23 | UI vieja borrada; Home temporal hasta la fase 3 | Adaptarla al modelo nuevo era trabajo descartable |
 | 2026-10-23 | Tests de `AttachmentStore` y repositorio instrumentados (sin Robolectric) | La decodificación de imágenes y EXIF solo es fiel en un dispositivo real |
+| 2026-10-23 | CameraX 1.6.2 con `camera-compose` | Visor nativo de Compose, sin `PreviewView` |
+| 2026-10-23 | Lo compartido se copia antes de elegir destino | Las URIs recibidas pueden vencer; garantía 10 |

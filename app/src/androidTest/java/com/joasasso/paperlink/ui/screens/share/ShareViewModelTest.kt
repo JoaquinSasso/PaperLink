@@ -11,10 +11,12 @@ import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.data.repository.AttachmentSource
 import com.joasasso.paperlink.data.repository.LinkRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -131,6 +133,20 @@ class ShareViewModelTest {
         withTimeout(15_000) { vm.state.first { it.closed } }
 
         assertTrue(dir.mediaFiles().isEmpty())
+    }
+
+    @Test
+    fun cancelDuringCopy_stopsCopyAndLeavesNothing() = runBlocking {
+        val big = dir.source("video.mp4", ByteArray(200 * 1024 * 1024))
+        val vm = viewModel(listOf(file("a.pdf"), big), text = null)
+        // Esperar a que esté copiando el archivo grande.
+        vm.awaitPhase { it is ShareViewModel.Phase.Copying && it.fileIndex == 1 && it.progress != null }
+
+        withContext(Dispatchers.Main) { vm.cancel() }
+        withTimeout(15_000) { vm.state.first { it.closed } }
+
+        assertTrue("Quedaron archivos: ${dir.mediaFiles()}", dir.mediaFiles().isEmpty())
+        assertEquals(0, repository.observeCount().first())
     }
 
     @Test

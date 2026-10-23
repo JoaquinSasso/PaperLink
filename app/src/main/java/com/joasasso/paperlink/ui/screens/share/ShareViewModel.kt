@@ -22,6 +22,8 @@ import com.joasasso.paperlink.ui.common.messageRes
 import com.joasasso.paperlink.ui.navigation.ShareDestination
 import com.joasasso.paperlink.util.log
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,6 +74,8 @@ class ShareViewModel(
         }
     }
 
+    private var copyJob: Job? = null
+
     private val _state = MutableStateFlow(
         UiState(
             phase = when {
@@ -101,9 +105,14 @@ class ShareViewModel(
         save(appendTo = code)
     }
 
-    /** Descarta lo copiado y cierra. */
+    /**
+     * Frena la copia en curso (su `.part` lo borra el almacén), descarta lo ya copiado y cierra.
+     * Mientras se guarda en la base no hace nada: lo copiado puede estar quedando vinculado.
+     */
     fun cancel() {
+        if (_state.value.phase == Phase.Saving) return
         viewModelScope.launch {
+            copyJob?.cancelAndJoin()
             for (file in staged()) {
                 if (!store.delete(file.relativePath)) log("Could not delete staged file")
             }
@@ -117,7 +126,7 @@ class ShareViewModel(
     }
 
     private fun copyFiles() {
-        viewModelScope.launch {
+        copyJob = viewModelScope.launch {
             try {
                 // Retoma desde donde quedó si el proceso murió a mitad de la copia.
                 for (index in staged().size until uris.size) {
