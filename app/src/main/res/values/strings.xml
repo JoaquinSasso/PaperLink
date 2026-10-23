@@ -26,7 +26,6 @@
 
     <string name="add_back_cd">Back</string>
     <string name="add_url_label">URL (https://...)</string>
-    <string name="add_note_label">Write your note here...</string>
     <string name="add_file_selected">File selected</string>
     <string name="add_no_file_selected">No file selected</string>
     <string name="add_select_file_btn">Select file</string>
@@ -63,9 +62,88 @@
     <string name="onboarding_desc_page4">Whenever you review your notes and need the file, enter the code in PaperLink. Your digital document opens in a flash!</string>
 
     <!-- Home temporal (reescritura) -->
-    <string name="home_rewrite_notice">Rewrite in progress. Capturing and finding codes will be back soon.</string>
+    <string name="home_rewrite_notice">Rewrite in progress. Finding codes will be back soon.</string>
     <plurals name="home_link_count">
         <item quantity="one">%d code saved</item>
         <item quantity="other">%d codes saved</item>
     </plurals>
+
+    <!-- Comunes -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_save">Save</string>
+    <string name="error_no_space">Not enough storage space. Free up some space and try again.</string>
+    <string name="error_source_unreadable">The file could not be read. Try sharing or picking it again.</string>
+    <string name="error_code_not_found">That code does not exist.</string>
+    <string name="error_invalid_code">Codes have 4 characters (letters and numbers).</string>
+    <string name="error_generic">Something went wrong. Nothing was saved.</string>
+    <string name="import_progress_title">Saving…</string>
+    <string name="import_progress_file">File %1$d of %2$d</string>
+
+    <!-- Agregar contenido -->
+    <string name="add_option_camera">Camera</string>
+    <string name="add_option_media">Photos and videos</string>
+    <string name="add_option_files">Files</string>
+    <string name="add_option_link">Link</string>
+    <string name="add_option_note">Note</string>
+    <string name="add_link_title">Add a link</string>
+    <string name="add_link_label">Web address</string>
+    <string name="add_link_invalid">That does not look like a web address.</string>
+    <string name="add_note_title">Add a note</string>
+    <string name="add_note_label">Note</string>
+
+    <!-- Cámara -->
+    <string name="camera_permission_needed">PaperLink needs the camera to take photos of your notes. Photos stay on this phone.</string>
+    <string name="camera_permission_allow">Allow camera</string>
+    <string name="camera_permission_settings">Open settings</string>
+    <string name="camera_shutter_cd">Take photo</string>
+    <string name="camera_close_cd">Close camera</string>
+    <string name="camera_done">Done</string>
+    <string name="camera_error_capture">The photo could not be taken. Try again.</string>
+    <string name="camera_error_unavailable">The camera is not available.</string>
+    <plurals name="camera_photo_count">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+
+    <!-- Pantalla del código -->
+    <string name="code_title">Your code</string>
+    <string name="code_spoken">Code %1$s</string>
+    <string name="code_hint">Write it down in your notebook. Enter it later to open what you saved.</string>
+    <string name="code_label_hint">Label (optional)</string>
+    <string name="code_add_more">Add more</string>
+    <string name="code_done">Done</string>
+    <string name="code_added">Added</string>
+    <plurals name="code_attachment_count">
+        <item quantity="one">%d item saved</item>
+        <item quantity="other">%d items saved</item>
+    </plurals>
+
+    <!-- Compartir -->
+    <string name="share_title">Save to PaperLink</string>
+    <string name="share_note">a note</string>
+    <string name="share_copying">Copying file %1$d of %2$d…</string>
+    <string name="share_new_code">New code</string>
+    <string name="share_or_existing">Or add it to an existing code:</string>
+    <string name="share_existing_hint">Code</string>
+    <string name="share_add_to_existing">Add</string>
+    <string name="share_nothing">There is nothing to save.</string>
+    <string name="share_failed_nothing_saved">No code was created.</string>
+    <plurals name="share_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <plurals name="share_links">
+        <item quantity="one">%d link</item>
+        <item quantity="other">%d links</item>
+    </plurals>
+
+    <!-- Home temporal -->
+    <string name="home_new_code">New code</string>
+    <string name="home_last_code">Last code: %1$s</string>
+
+    <!-- Atajo y widget -->
+    <string name="shortcut_capture_short">Take photo</string>
+    <string name="shortcut_capture_long">Take a photo and get a code</string>
+    <string name="widget_label">PaperLink camera</string>
 </resources>

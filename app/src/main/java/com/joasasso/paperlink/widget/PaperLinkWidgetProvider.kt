@@ -19,11 +19,9 @@ class PaperLinkWidgetProvider : AppWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
-            // Intent para abrir la cámara directamente
+            // Abre la cámara directamente
             val intent = Intent(context, MainActivity::class.java).apply {
-                action = "com.joasasso.paperlink.ACTION_LAUNCH_CAMERA"
-                // Añadimos categorías y flags para asegurar que se trate como un trigger único
-                addCategory(Intent.CATEGORY_LAUNCHER)
+                action = MainActivity.ACTION_CAPTURE
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
 

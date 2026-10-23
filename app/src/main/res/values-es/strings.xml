@@ -26,7 +26,6 @@
 
     <string name="add_back_cd">Atrás</string>
     <string name="add_url_label">URL (https://...)</string>
-    <string name="add_note_label">Escribe tu nota aquí...</string>
     <string name="add_file_selected">Archivo seleccionado</string>
     <string name="add_no_file_selected">Ningún archivo seleccionado</string>
     <string name="add_select_file_btn">Seleccionar archivo</string>
@@ -63,9 +62,88 @@
     <string name="onboarding_desc_page4">Cuando estés repasando y necesites el archivo, ingresá el código en PaperLink. ¡Tu documento se abre al instante!</string>
 
     <!-- Home temporal (reescritura) -->
-    <string name="home_rewrite_notice">Reescritura en curso. Pronto vuelven la captura y la búsqueda de códigos.</string>
+    <string name="home_rewrite_notice">Reescritura en curso. Pronto vuelve la búsqueda de códigos.</string>
     <plurals name="home_link_count">
         <item quantity="one">%d código guardado</item>
         <item quantity="other">%d códigos guardados</item>
     </plurals>
+
+    <!-- Comunes -->
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_save">Guardar</string>
+    <string name="error_no_space">No hay espacio suficiente. Liberá espacio y volvé a intentar.</string>
+    <string name="error_source_unreadable">No se pudo leer el archivo. Probá compartirlo o elegirlo de nuevo.</string>
+    <string name="error_code_not_found">Ese código no existe.</string>
+    <string name="error_invalid_code">Los códigos tienen 4 caracteres (letras y números).</string>
+    <string name="error_generic">Algo salió mal. No se guardó nada.</string>
+    <string name="import_progress_title">Guardando…</string>
+    <string name="import_progress_file">Archivo %1$d de %2$d</string>
+
+    <!-- Agregar contenido -->
+    <string name="add_option_camera">Cámara</string>
+    <string name="add_option_media">Fotos y videos</string>
+    <string name="add_option_files">Archivos</string>
+    <string name="add_option_link">Link</string>
+    <string name="add_option_note">Nota</string>
+    <string name="add_link_title">Agregar un link</string>
+    <string name="add_link_label">Dirección web</string>
+    <string name="add_link_invalid">Eso no parece una dirección web.</string>
+    <string name="add_note_title">Agregar una nota</string>
+    <string name="add_note_label">Nota</string>
+
+    <!-- Cámara -->
+    <string name="camera_permission_needed">PaperLink necesita la cámara para sacar fotos de tus apuntes. Las fotos quedan en este teléfono.</string>
+    <string name="camera_permission_allow">Permitir cámara</string>
+    <string name="camera_permission_settings">Abrir ajustes</string>
+    <string name="camera_shutter_cd">Sacar foto</string>
+    <string name="camera_close_cd">Cerrar cámara</string>
+    <string name="camera_done">Listo</string>
+    <string name="camera_error_capture">No se pudo sacar la foto. Volvé a intentar.</string>
+    <string name="camera_error_unavailable">La cámara no está disponible.</string>
+    <plurals name="camera_photo_count">
+        <item quantity="one">%d foto</item>
+        <item quantity="other">%d fotos</item>
+    </plurals>
+
+    <!-- Pantalla del código -->
+    <string name="code_title">Tu código</string>
+    <string name="code_spoken">Código %1$s</string>
+    <string name="code_hint">Anotalo en tu cuaderno. Después ingresalo para abrir lo que guardaste.</string>
+    <string name="code_label_hint">Etiqueta (opcional)</string>
+    <string name="code_add_more">Agregar más</string>
+    <string name="code_done">Listo</string>
+    <string name="code_added">Agregado</string>
+    <plurals name="code_attachment_count">
+        <item quantity="one">%d elemento guardado</item>
+        <item quantity="other">%d elementos guardados</item>
+    </plurals>
+
+    <!-- Compartir -->
+    <string name="share_title">Guardar en PaperLink</string>
+    <string name="share_note">una nota</string>
+    <string name="share_copying">Copiando archivo %1$d de %2$d…</string>
+    <string name="share_new_code">Código nuevo</string>
+    <string name="share_or_existing">O agregalo a un código existente:</string>
+    <string name="share_existing_hint">Código</string>
+    <string name="share_add_to_existing">Agregar</string>
+    <string name="share_nothing">No hay nada para guardar.</string>
+    <string name="share_failed_nothing_saved">No se creó ningún código.</string>
+    <plurals name="share_files">
+        <item quantity="one">%d archivo</item>
+        <item quantity="other">%d archivos</item>
+    </plurals>
+    <plurals name="share_links">
+        <item quantity="one">%d link</item>
+        <item quantity="other">%d links</item>
+    </plurals>
+
+    <!-- Home temporal -->
+    <string name="home_new_code">Código nuevo</string>
+    <string name="home_last_code">Último código: %1$s</string>
+
+    <!-- Atajo y widget -->
+    <string name="shortcut_capture_short">Sacar foto</string>
+    <string name="shortcut_capture_long">Sacar una foto y obtener un código</string>
+    <string name="widget_label">Cámara de PaperLink</string>
 </resources>
