@@ -151,12 +151,23 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 
 ### Fase 1 — Base de datos y almacén
 - [x] Confirmar la decisión del alfabeto (sección 4): 26 caracteres, ya aplicado en `CodeAlphabet` con sus tests.
-- [ ] Entidades y DAO (uno alcanza), base versión 3 con el descarte de 1 y 2.
-- [ ] `AttachmentStore` con tests (import de imagen con re-codificación, archivo genérico, borrado).
-- [ ] `LinkRepository`.
-- [ ] Función `log()` de debug.
-- [ ] Borrar el código viejo que quede sin uso.
+- [x] Entidades y DAO (uno alcanza), base versión 3 con el descarte de 1 y 2.
+- [x] `AttachmentStore` con tests (import de imagen con re-codificación, archivo genérico, borrado).
+- [x] `LinkRepository`.
+- [x] Función `log()` de debug.
+- [x] Borrar el código viejo que quede sin uso.
 - **Criterio:** instalada sobre la versión vieja, la app abre sin crashear y con la base vacía; tests en verde.
+- **Verificación (23/10/2026):** instalada sobre la 0.1.0 (con datos) en un Pixel 8 (API 37): abre sin crashear, base en versión 3 y vacía, sin errores en logcat. 16 unit tests y 29 instrumentados en verde.
+- **Notas y decisiones:**
+  - UI vieja (Home, AddLink, TxtViewer, cámara del Home, banner de foto reciente) borrada. Queda una Home temporal que muestra la cantidad de códigos; se reemplaza en la fase 3. Se mantienen onboarding, tema y widget (su acción de cámara vuelve en la fase 2). Se quitó el `intent-filter` de `SEND` hasta la fase 2. Se borró `values-en/` (duplicaba a `values/`).
+  - `AppContainer` pasó a ser una clase (la interfaz tenía una sola implementación). Tiene un `applicationScope` para mantenimiento y purgas diferidas.
+  - Imágenes: un solo camino con `BitmapFactory` (con `inSampleSize`) y `androidx.exifinterface` para la orientación, en todas las versiones de API. HEIC/HEIF se decodifica desde API 28; si no se puede decodificar (o falta memoria) se guarda el original. Los GIF no se re-codifican (se perdería la animación). Las transparencias se componen sobre blanco.
+  - Constantes: ventana de deshacer de 15 s (`LinkRepository.UNDO_WINDOW_MS`), margen de espacio libre de 50 MB y antigüedad mínima de 1 h para que el barrido borre algo (evita pisar una importación en curso).
+  - La generación de código es `CodeAlphabet.generate()`; el repositorio inserta con `IGNORE` y reintenta si choca (incluye códigos con borrado lógico).
+  - Los tests instrumentados usan base en memoria y un directorio temporal en `cacheDir`, sin tocar los datos reales. Se corren con `./gradlew installDebug installDebugAndroidTest` + `adb shell am instrument -w com.joasasso.paperlink.debug.test/androidx.test.runner.AndroidJUnitRunner`, porque `connectedDebugAndroidTest` desinstala la app al terminar.
+  - `room-testing` no se agregó: todavía no hay migraciones. Entra con la primera.
+  - Búsqueda por etiqueta: `LIKE` ignora mayúsculas solo en ASCII y no ignora tildes ("fisica" no encuentra "Física"). A resolver en la fase 3.
+  - Pendiente de la matriz: probar una foto HEIC real y un video de más de 1 GB (fase 2, con la cámara y el compartir).
 
 ### Fase 2 — Captura
 - [ ] Pantalla de cámara con CameraX, multi-foto, permiso pedido en el momento.
@@ -201,3 +212,5 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 2026-10-23 | Balance simpleza / buenas prácticas: se mantienen capas, inyección y tests; se evita la indirección sin uso | Código simple pero mantenible y testeable |
 | 2026-10-23 | Se trabaja directo en `master`, sin ramas `rewrite/fase-N` | No interesa conservar una rama con la versión anterior |
 | 2026-10-23 | Alfabeto de 26 caracteres (sin I/1, O/0, Z/2, S/5, B/8) | Menos errores al leer códigos escritos a mano; 456.976 combinaciones sobran para una persona |
+| 2026-10-23 | UI vieja borrada; Home temporal hasta la fase 3 | Adaptarla al modelo nuevo era trabajo descartable |
+| 2026-10-23 | Tests de `AttachmentStore` y repositorio instrumentados (sin Robolectric) | La decodificación de imágenes y EXIF solo es fiel en un dispositivo real |
