@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 class CodeAlphabetTest {
 
@@ -65,5 +66,26 @@ class CodeAlphabetTest {
     @Test
     fun normalize_thenIsValid_acceptsLowercaseInput() {
         assertTrue(CodeAlphabet.isValid(CodeAlphabet.normalize("hwq3")))
+    }
+
+    @Test
+    fun generate_alwaysProducesValidCodes() {
+        val random = Random(1)
+        repeat(10_000) {
+            val code = CodeAlphabet.generate(random)
+            assertTrue("Código inválido: $code", CodeAlphabet.isValid(code))
+        }
+    }
+
+    @Test
+    fun generate_usesEveryCharacterOfTheAlphabet() {
+        val random = Random(2)
+        val seen = (1..2_000).flatMap { CodeAlphabet.generate(random).toList() }.toSet()
+        assertEquals(CodeAlphabet.ALLOWED_CHARACTERS.toSet(), seen)
+    }
+
+    @Test
+    fun generate_isDeterministicForTheSameSeed() {
+        assertEquals(CodeAlphabet.generate(Random(42)), CodeAlphabet.generate(Random(42)))
     }
 }
