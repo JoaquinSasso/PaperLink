@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solo en builds de debug: herramientas de prueba que no llegan a release. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name=".debug.SeedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.joasasso.paperlink.debug.SEED" />
+                <action android:name="com.joasasso.paperlink.debug.UNSEED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

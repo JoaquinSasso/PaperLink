@@ -3,16 +3,20 @@ package com.joasasso.paperlink.ui.navigation
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.joasasso.paperlink.ui.screens.camera.CameraScreen
 import com.joasasso.paperlink.ui.screens.code.CodeScreen
+import com.joasasso.paperlink.ui.screens.detail.DetailScreen
 import com.joasasso.paperlink.ui.screens.home.HomeScreen
 import com.joasasso.paperlink.ui.screens.onboarding.OnboardingScreen
 import com.joasasso.paperlink.ui.screens.share.ShareScreen
+import com.joasasso.paperlink.ui.screens.viewer.ViewerScreen
 import kotlinx.serialization.Serializable
 
 @Serializable object HomeDestination
@@ -22,6 +26,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class CameraDestination(val appendTo: String? = null)
 
 /**
+ * Pantalla que se muestra al crear un código.
  * @param justCreated vibra al mostrarlo (solo códigos recién creados).
  * @param finishOnDone al tocar "Listo" se cierra la app (se llegó compartiendo desde otra app).
  */
@@ -32,6 +37,14 @@ import kotlinx.serialization.Serializable
 )
 
 @Serializable data class ShareDestination(val uris: List<String>, val text: String?)
+
+/** @param startId elemento con el que abre; null = el primero. */
+@Serializable data class ViewerDestination(val code: String, val startId: String? = null)
+
+@Serializable data class DetailDestination(val code: String)
+
+/** Clave del código recién borrado, que la Home recibe para ofrecer "Deshacer". */
+private const val KEY_DELETED_CODE = "deleted_code"
 
 /**
  * @param launchRoute destino pedido por un intent (cámara o compartir); reemplaza toda la pila.
@@ -67,10 +80,19 @@ fun PaperLinkNavHost(
             OnboardingScreen(onFinish = ::goHome)
         }
 
-        composable<HomeDestination> {
+        composable<HomeDestination> { entry ->
+            val deletedCode by entry.savedStateHandle.getStateFlow<String?>(KEY_DELETED_CODE, null)
+                .collectAsStateWithLifecycle()
             HomeScreen(
+                onOpenCode = { code -> navController.navigate(ViewerDestination(code)) },
+                onCodeCreated = { code -> navController.navigate(CodeDestination(code, justCreated = true)) },
                 onOpenCamera = { navController.navigate(CameraDestination()) },
-                onOpenCode = { code, justCreated -> navController.navigate(CodeDestination(code, justCreated)) },
+                deletedCode = deletedCode,
+                onDeletedCodeHandled = { code ->
+                    if (entry.savedStateHandle.get<String>(KEY_DELETED_CODE) == code) {
+                        entry.savedStateHandle[KEY_DELETED_CODE] = null
+                    }
+                },
             )
         }
 
@@ -106,6 +128,33 @@ fun PaperLinkNavHost(
                     }
                 },
                 onClose = { activity?.finish() },
+            )
+        }
+
+        composable<ViewerDestination> {
+            ViewerScreen(
+                onBack = { if (!navController.popBackStack()) goHome() },
+                onOpenDetail = { code -> navController.navigate(DetailDestination(code)) },
+            )
+        }
+
+        composable<DetailDestination> {
+            DetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAttachment = { code, id ->
+                    // Reemplaza el visor anterior (y este detalle) por uno que abre en el elemento elegido.
+                    navController.navigate(ViewerDestination(code, startId = id)) {
+                        popUpTo<ViewerDestination> { inclusive = true }
+                    }
+                },
+                onAddWithCamera = { code -> navController.navigate(CameraDestination(appendTo = code)) },
+                onCodeDeleted = { code ->
+                    if (navController.popBackStack<HomeDestination>(inclusive = false)) {
+                        navController.currentBackStackEntry?.savedStateHandle?.set(KEY_DELETED_CODE, code)
+                    } else {
+                        goHome()
+                    }
+                },
             )
         }
     }

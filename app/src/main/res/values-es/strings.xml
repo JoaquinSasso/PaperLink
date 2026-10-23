@@ -22,7 +22,6 @@
     <string name="home_recent_photo_subtitle">Toca para generar código al instante</string>
     <string name="home_dismiss_cd">Descartar</string>
     <string name="home_error_saving">Error al guardar: %1$s</string>
-    <string name="home_code_not_found">Código no encontrado</string>
 
     <string name="add_back_cd">Atrás</string>
     <string name="add_url_label">URL (https://...)</string>
@@ -60,13 +59,6 @@
 
     <string name="onboarding_title_page4">3. Abre al Instante</string>
     <string name="onboarding_desc_page4">Cuando estés repasando y necesites el archivo, ingresá el código en PaperLink. ¡Tu documento se abre al instante!</string>
-
-    <!-- Home temporal (reescritura) -->
-    <string name="home_rewrite_notice">Reescritura en curso. Pronto vuelve la búsqueda de códigos.</string>
-    <plurals name="home_link_count">
-        <item quantity="one">%d código guardado</item>
-        <item quantity="other">%d códigos guardados</item>
-    </plurals>
 
     <!-- Comunes -->
     <string name="action_cancel">Cancelar</string>
@@ -138,12 +130,59 @@
         <item quantity="other">%d links</item>
     </plurals>
 
-    <!-- Home temporal -->
-    <string name="home_new_code">Código nuevo</string>
-    <string name="home_last_code">Último código: %1$s</string>
-
     <!-- Atajo y widget -->
     <string name="shortcut_capture_short">Sacar foto</string>
     <string name="shortcut_capture_long">Sacar una foto y obtener un código</string>
     <string name="widget_label">Cámara de PaperLink</string>
+
+    <!-- Fase 3: comunes -->
+    <string name="action_undo">Deshacer</string>
+    <string name="action_delete">Borrar</string>
+    <string name="undo_too_late">Ya no se puede deshacer.</string>
+    <string name="file_unavailable">Archivo no disponible</string>
+    <string name="kind_image">Foto</string>
+    <string name="kind_video">Video</string>
+    <string name="kind_audio">Audio</string>
+    <string name="kind_pdf">PDF</string>
+    <string name="kind_file">Archivo</string>
+    <string name="kind_link">Link</string>
+    <string name="kind_note">Nota</string>
+
+    <!-- Campo de código -->
+    <string name="code_input_cd">Código</string>
+    <string name="code_input_state">%1$d de %2$d caracteres</string>
+    <string name="code_input_error_cd">Código no encontrado</string>
+
+    <!-- Home -->
+    <string name="home_enter_code">Ingresá un código</string>
+    <string name="home_new_code">Nuevo</string>
+    <string name="home_search_label">Buscar por etiqueta</string>
+    <string name="home_search_clear">Borrar búsqueda</string>
+    <string name="home_recent">Recientes</string>
+    <string name="home_results">Resultados</string>
+    <string name="home_empty">Todavía no hay códigos. Tocá Nuevo o usá el widget de cámara de PaperLink.</string>
+    <string name="home_no_results">Ninguna etiqueta coincide con la búsqueda.</string>
+    <string name="home_code_not_found">El código %1$s no existe.</string>
+    <string name="home_invalid_chars">Los códigos nunca usan O, 0, I, 1, Z, 2, S, 5, B ni 8. Revisá lo que escribiste.</string>
+    <string name="home_did_you_mean">¿Quisiste decir?</string>
+    <string name="home_code_deleted">Código %1$s borrado</string>
+    <plurals name="home_row_details">
+        <item quantity="one">%1$d elemento · %2$s</item>
+        <item quantity="other">%1$d elementos · %2$s</item>
+    </plurals>
+
+    <!-- Visor -->
+    <string name="viewer_detail">Detalle</string>
+    <string name="viewer_empty">Este código no tiene nada guardado.</string>
+    <string name="viewer_position">%1$d / %2$d</string>
+    <string name="viewer_open_link">Abrir link</string>
+    <string name="viewer_open_with">Abrir con…</string>
+    <string name="viewer_no_app">Ninguna app de este teléfono puede abrir esto.</string>
+
+    <!-- Detalle -->
+    <string name="detail_delete_code">Borrar código</string>
+    <string name="detail_delete_code_title">¿Borrar el código %1$s?</string>
+    <string name="detail_delete_code_text">Se borra todo lo guardado en él. Vas a poder deshacerlo por unos segundos.</string>
+    <string name="detail_delete_item">Borrar elemento</string>
+    <string name="detail_item_deleted">Elemento borrado</string>
 </resources>

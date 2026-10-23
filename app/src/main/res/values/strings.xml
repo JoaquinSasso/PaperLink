@@ -22,7 +22,6 @@
     <string name="home_recent_photo_subtitle">Tap to generate code instantly</string>
     <string name="home_dismiss_cd">Dismiss</string>
     <string name="home_error_saving">Error saving: %1$s</string>
-    <string name="home_code_not_found">Code not found</string>
 
     <string name="add_back_cd">Back</string>
     <string name="add_url_label">URL (https://...)</string>
@@ -60,13 +59,6 @@
 
     <string name="onboarding_title_page4">3. Open Instantly</string>
     <string name="onboarding_desc_page4">Whenever you review your notes and need the file, enter the code in PaperLink. Your digital document opens in a flash!</string>
-
-    <!-- Home temporal (reescritura) -->
-    <string name="home_rewrite_notice">Rewrite in progress. Finding codes will be back soon.</string>
-    <plurals name="home_link_count">
-        <item quantity="one">%d code saved</item>
-        <item quantity="other">%d codes saved</item>
-    </plurals>
 
     <!-- Comunes -->
     <string name="action_cancel">Cancel</string>
@@ -138,12 +130,59 @@
         <item quantity="other">%d links</item>
     </plurals>
 
-    <!-- Home temporal -->
-    <string name="home_new_code">New code</string>
-    <string name="home_last_code">Last code: %1$s</string>
-
     <!-- Atajo y widget -->
     <string name="shortcut_capture_short">Take photo</string>
     <string name="shortcut_capture_long">Take a photo and get a code</string>
     <string name="widget_label">PaperLink camera</string>
+
+    <!-- Fase 3: comunes -->
+    <string name="action_undo">Undo</string>
+    <string name="action_delete">Delete</string>
+    <string name="undo_too_late">It can no longer be undone.</string>
+    <string name="file_unavailable">File not available</string>
+    <string name="kind_image">Photo</string>
+    <string name="kind_video">Video</string>
+    <string name="kind_audio">Audio</string>
+    <string name="kind_pdf">PDF</string>
+    <string name="kind_file">File</string>
+    <string name="kind_link">Link</string>
+    <string name="kind_note">Note</string>
+
+    <!-- Campo de código -->
+    <string name="code_input_cd">Code</string>
+    <string name="code_input_state">%1$d of %2$d characters</string>
+    <string name="code_input_error_cd">Code not found</string>
+
+    <!-- Home -->
+    <string name="home_enter_code">Enter a code</string>
+    <string name="home_new_code">New</string>
+    <string name="home_search_label">Search by label</string>
+    <string name="home_search_clear">Clear search</string>
+    <string name="home_recent">Recent</string>
+    <string name="home_results">Results</string>
+    <string name="home_empty">No codes yet. Tap New or use the PaperLink camera widget.</string>
+    <string name="home_no_results">No label matches that search.</string>
+    <string name="home_code_not_found">Code %1$s does not exist.</string>
+    <string name="home_invalid_chars">Codes never use O, 0, I, 1, Z, 2, S, 5, B or 8. Check what you wrote.</string>
+    <string name="home_did_you_mean">Did you mean:</string>
+    <string name="home_code_deleted">Code %1$s deleted</string>
+    <plurals name="home_row_details">
+        <item quantity="one">%1$d item · %2$s</item>
+        <item quantity="other">%1$d items · %2$s</item>
+    </plurals>
+
+    <!-- Visor -->
+    <string name="viewer_detail">Details</string>
+    <string name="viewer_empty">This code has nothing saved.</string>
+    <string name="viewer_position">%1$d / %2$d</string>
+    <string name="viewer_open_link">Open link</string>
+    <string name="viewer_open_with">Open with…</string>
+    <string name="viewer_no_app">No app on this phone can open this.</string>
+
+    <!-- Detalle -->
+    <string name="detail_delete_code">Delete code</string>
+    <string name="detail_delete_code_title">Delete code %1$s?</string>
+    <string name="detail_delete_code_text">Everything saved in it will be deleted. You can undo it for a few seconds.</string>
+    <string name="detail_delete_item">Delete item</string>
+    <string name="detail_item_deleted">Item deleted</string>
 </resources>
