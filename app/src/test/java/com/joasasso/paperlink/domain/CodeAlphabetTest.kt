@@ -69,6 +69,15 @@ class CodeAlphabetTest {
     }
 
     @Test
+    fun sanitizeInput_keepsAsciiLettersAndDigitsUppercase() {
+        assertEquals("HWQ3", CodeAlphabet.sanitizeInput(" hw-q3 "))
+        assertEquals("ACDE", CodeAlphabet.sanitizeInput("acdefg"))
+        // Caracteres fuera del alfabeto pasan (para avisar y sugerir); acentos y símbolos no.
+        assertEquals("HWO1", CodeAlphabet.sanitizeInput("hwo1"))
+        assertEquals("AC", CodeAlphabet.sanitizeInput("Á,A C"))
+    }
+
+    @Test
     fun generate_alwaysProducesValidCodes() {
         val random = Random(1)
         repeat(10_000) {

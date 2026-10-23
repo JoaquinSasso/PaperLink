@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 
 /**
  * La base de la app anterior (versiones 1 y 2) se descarta: al actualizar, la app abre
- * sin crashear y con la base vacía en la versión 3.
+ * sin crashear y con la base vacía en la versión actual.
  */
 @RunWith(AndroidJUnit4::class)
 class DatabaseUpgradeTest {
@@ -40,7 +40,7 @@ class DatabaseUpgradeTest {
             db.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE name = 'paper_links'").use {
                 assertEquals("La tabla vieja debería haberse borrado", 0, it.count)
             }
-            assertEquals(3, db.openHelper.readableDatabase.version)
+            assertEquals(PaperLinkDatabase.VERSION, db.openHelper.readableDatabase.version)
         } finally {
             db.close()
         }

@@ -258,6 +258,69 @@ class LinkRepositoryTest {
     }
 
     @Test
+    fun deleteAttachment_hidesItAndUndoRestoresIt() = runBlocking {
+        val repo = repository()
+        val code = repo.createLink(listOf(file("a.pdf"), AttachmentSource.Note("n")))
+        val pdf = repo.getLink(code)!!.attachments.first()
+
+        assertTrue(repo.deleteAttachment(pdf.id))
+        assertEquals(listOf(Kind.NOTE), repo.getLink(code)!!.attachments.map { it.kind })
+        assertFalse(repo.deleteAttachment(pdf.id))
+
+        assertTrue(repo.undoDeleteAttachment(pdf.id))
+        assertEquals(listOf(Kind.PDF, Kind.NOTE), repo.getLink(code)!!.attachments.map { it.kind })
+    }
+
+    @Test
+    fun purgeExpired_removesDeletedAttachmentAndItsFile() = runBlocking {
+        val repo = repository()
+        val code = repo.createLink(listOf(file("a.pdf"), file("b.pdf")))
+        val first = repo.getLink(code)!!.attachments.first()
+        repo.deleteAttachment(first.id)
+
+        now += LinkRepository.UNDO_WINDOW_MS
+        repo.purgeExpired()
+
+        assertEquals(1, dir.mediaFiles().size)
+        assertFalse(File(dir.base, first.relativePath!!).exists())
+        assertFalse(repo.undoDeleteAttachment(first.id))
+        assertEquals(1, repo.getLink(code)!!.attachments.size)
+    }
+
+    @Test
+    fun linkContent_flagsFilesMissingOnDisk() = runBlocking {
+        val repo = repository()
+        val code = repo.createLink(listOf(file("a.pdf"), AttachmentSource.Note("n")))
+        val pdf = repo.getLink(code)!!.attachments.first()
+        File(dir.base, pdf.relativePath!!).delete()
+
+        val content = repo.observeLinkContent(code).first()!!
+
+        assertEquals(setOf(pdf.id), content.unavailableIds)
+        assertEquals(2, content.link.attachments.size)
+    }
+
+    @Test
+    fun searchByLabel_ignoresAccents() = runBlocking {
+        val repo = repository()
+        val physics = repo.createLink(listOf(AttachmentSource.Note("x")), label = "Física II")
+        repo.createLink(listOf(AttachmentSource.Note("x")), label = "Química")
+
+        assertEquals(listOf(physics), repo.searchByLabel("fisica").first().map { it.link.code })
+        assertEquals(listOf(physics), repo.searchByLabel("  FÍSICA ").first().map { it.link.code })
+    }
+
+    @Test
+    fun allCodes_excludesDeletedCodes() = runBlocking {
+        val repo = repository()
+        val kept = repo.createLink(listOf(AttachmentSource.Note("a")))
+        val deleted = repo.createLink(listOf(AttachmentSource.Note("b")))
+        repo.delete(deleted)
+
+        assertEquals(listOf(kept), repo.allCodes())
+    }
+
+    @Test
     fun delete_missingCodeFails() = runBlocking {
         try {
             repository().delete("ACDE")
