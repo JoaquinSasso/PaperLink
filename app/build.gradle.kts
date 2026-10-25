@@ -117,6 +117,11 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
+    // Respaldo en segundo plano y Google Drive
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.play.services.auth)
+    implementation(libs.okhttp)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

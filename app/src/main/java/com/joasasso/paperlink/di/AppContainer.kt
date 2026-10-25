@@ -1,6 +1,11 @@
 package com.joasasso.paperlink.di
 
 import android.content.Context
+import com.joasasso.paperlink.data.backup.DriveAppDataClient
+import com.joasasso.paperlink.data.backup.DriveAuthManager
+import com.joasasso.paperlink.data.backup.DriveBackupManager
+import com.joasasso.paperlink.data.backup.WorkManagerBackupScheduler
+import com.joasasso.paperlink.data.backup.ZipBackupManager
 import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
@@ -32,5 +37,24 @@ class AppContainer(context: Context) {
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context)
+    }
+
+    val zipBackupManager: ZipBackupManager by lazy {
+        ZipBackupManager(attachmentStore, linkRepository)
+    }
+
+    val driveAuthManager: DriveAuthManager by lazy {
+        DriveAuthManager(context)
+    }
+
+    val driveBackupManager: DriveBackupManager by lazy {
+        DriveBackupManager(
+            store = attachmentStore,
+            repository = linkRepository,
+            preferences = userPreferencesRepository,
+            tokenProvider = driveAuthManager,
+            remote = DriveAppDataClient(),
+            scheduler = WorkManagerBackupScheduler(context),
+        )
     }
 }

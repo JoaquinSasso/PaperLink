@@ -9,9 +9,11 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.video.VideoFrameDecoder
+import com.joasasso.paperlink.data.backup.WorkManagerBackupScheduler
 import com.joasasso.paperlink.di.AppContainer
 import com.joasasso.paperlink.util.PdfDecoder
 import com.joasasso.paperlink.util.log
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -31,8 +33,14 @@ class PaperLinkApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        // Purga de borrados vencidos y barrido de huérfanos, en segundo plano.
-        container.applicationScope.launch { container.linkRepository.runMaintenance() }
+        // Purga de borrados vencidos, barrido de huérfanos y verificación del respaldo diario.
+        container.applicationScope.launch {
+            container.linkRepository.runMaintenance()
+            val backupSettings = container.userPreferencesRepository.backupSettings.first()
+            if (backupSettings.driveEnabled) {
+                WorkManagerBackupScheduler(this@PaperLinkApp).ensureScheduled(backupSettings.chargingOnly)
+            }
+        }
         publishCaptureShortcut()
     }
 
