@@ -1,6 +1,17 @@
 # PaperLink — Plan de reescritura
 
-Origen: auditoría del 23/10/2026. Este documento es la especificación de trabajo; mantenerlo actualizado (checklists y decisiones) al cerrar cada fase.
+Origen: auditoría del 23/10/2026. Este documento es la especificación de trabajo; mantenerlo actualizado (checklists, decisiones y "Estado actual") al cerrar cada fase. La guía para agentes (invariantes, comandos, mapa del código, forma de trabajo) está en `AGENTS.md`.
+
+## Estado actual (para retomar)
+
+Actualizado: 25/10/2026.
+
+- **Hechas:** fases 0, 1, 2 y 3 (todo commiteado en `master`, sin push). 33 unit tests y 54 instrumentados en verde. Base de datos en versión 4.
+- **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar). Si funciona, marcar esa parte del criterio de la Fase 3 como verificada; si no, corregirlo antes de la Fase 4.
+- **Siguiente: Fase 4 (respaldo).** Empezar por la decisión pendiente `drive.appdata` vs `drive.file` (sección 7). Va a requerir que el usuario configure Google Cloud (dejarle instrucciones paso a paso) y dependencias nuevas (WorkManager, autorización de Google); preguntar antes de agregarlas. OkHttp ya está disponible vía `coil-network-okhttp`.
+- **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 son de la Fase 4.
+- **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (el usuario no tenía archivos así), dispositivo de gama baja y build de release con R8 → Fase 5.
+- **Herramientas:** el trabajo de las fases 0 a 3 se hizo con Claude Code; desde acá se puede seguir con Antigravity (`AGENTS.md`, `.agents/rules/`, `.agents/workflows/`: `/fase`, `/probar`, `/retomar`) o con Claude Code (`CLAUDE.md` importa `AGENTS.md`).
 
 ## 1. Contexto y diagnóstico
 
@@ -188,12 +199,25 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
   - Pendiente de la matriz: foto HEIC y video de más de 1 GB (el usuario no tenía archivos así); queda para la fase 5.
 
 ### Fase 3 — Recuperación
-- [ ] Home nueva: campo de código accesible (TalkBack, pegar), recientes, búsqueda por etiqueta, estado vacío.
-- [ ] Sugerencias de códigos parecidos.
-- [ ] Detalle del código: lista de attachments, editar etiqueta, agregar más, borrar con deshacer.
-- [ ] Visor de imágenes con zoom y paginado; abrir el resto con apps externas.
-- [ ] Edge-to-edge correcto.
+- [x] Home nueva: campo de código accesible (TalkBack, pegar), recientes, búsqueda por etiqueta, estado vacío.
+- [x] Sugerencias de códigos parecidos.
+- [x] Detalle del código: lista de attachments, editar etiqueta, agregar más, borrar con deshacer.
+- [x] Visor de imágenes con zoom y paginado; abrir el resto con apps externas.
+- [x] Edge-to-edge correcto.
 - **Criterio:** con 200 vínculos de prueba, abrir por código en menos de 1 s desde arranque en frío; TalkBack puede ingresar un código.
+- **Verificación (23/10/2026, Pixel 8, API 37):** con 203 códigos (200 de prueba vía `SeedReceiver`), arranque en frío 0,64–0,70 s y del cuarto carácter al visor ~0,19 s. La migración 3→4 corrió sobre los datos reales del usuario sin perder nada. Probado en el teléfono: código inexistente con sugerencias ("36OF" sugiere 36TF), visor con zoom por doble toque, detalle, borrar y deshacer un elemento, borrar y deshacer un código. 33 unit tests y 54 instrumentados en verde. **Pendiente: verificación con TalkBack por parte del usuario** (ver "Estado actual").
+- **Notas y decisiones:**
+  - Al completar un código existente se abre directo el **visor** (deslizable por todos los elementos); el detalle se abre desde el visor. El visor muestra arriba código y etiqueta (garantía 11).
+  - Sugerencias (`domain/CodeSuggestions.kt`): códigos a un carácter de distancia; primero los pares confundibles a mano U/V, M/N, G/6, Q/9, T/7, A/4. Los caracteres fuera del alfabeto (O, 0, I, 1…) funcionan como comodín (hasta 2) y además muestran un aviso específico.
+  - Borrar elementos sueltos: **primera migración real (v3 → v4)**, `attachments.deletedAt` con la misma ventana de deshacer y purga que los códigos. `@Relation` no filtra, así que el repositorio oculta los attachments borrados. `PaperLinkDatabase.VERSION` es la constante de versión que usan los tests. Se agregó `room-testing` y los esquemas se exponen como assets de `androidTest`.
+  - Zoom con **telephoto** (`zoomable-image-coil3` 0.19.0): carga la imagen a resolución completa por partes al hacer zoom, clave para leer apuntes. Medido: agrega ~80 KB al APK de release (3,54 MB con, 3,46 MB sin).
+  - Búsqueda por etiqueta en Kotlin (`domain/SearchText.kt`, sin tildes ni mayúsculas) sobre los códigos con etiqueta: sin cambio de esquema. Si algún día hay miles de códigos, considerar una columna normalizada.
+  - Campo de código: 4 cajas sobre un único `BasicTextField(TextFieldState)` con `InputTransformation`. Pasar a mayúsculas en `onValueChange` desincronizaba el teclado y perdía caracteres al escribir rápido (en una prueba abrió otro código). Accesibilidad: `contentDescription` "Código" + `stateDescription` "N de 4 caracteres"; los códigos se leen letra por letra (`code_spoken`).
+  - Recientes: los 50 últimos por fecha de modificación; el resto se encuentra por código o etiqueta. "Último código creado" (sección 6.2) = el primero de recientes.
+  - Borrar un código pide confirmación y además ofrece "Deshacer" en la Home. Los snackbars de deshacer marcan el evento como atendido **después** de mostrarse (si no, se cancelaban al instante).
+  - `AttachmentStore.fileFor` valida la ruta como texto (sin I/O), para usarse desde la UI al armar miniaturas. La disponibilidad real de archivos se calcula en `LinkRepository.observeLinkContent`.
+  - `PdfDecoder` ya no tiene `catch` vacío (loguea). Edge-to-edge con `enableEdgeToEdge()`.
+  - Herramienta de prueba solo en debug: `SeedReceiver` (`app/src/debug/`), carga/borra códigos con etiqueta `[seed]`.
 
 ### Fase 4 — Respaldo
 - [ ] Exportar e importar ZIP.
@@ -226,3 +250,8 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 2026-10-23 | Tests de `AttachmentStore` y repositorio instrumentados (sin Robolectric) | La decodificación de imágenes y EXIF solo es fiel en un dispositivo real |
 | 2026-10-23 | CameraX 1.6.2 con `camera-compose` | Visor nativo de Compose, sin `PreviewView` |
 | 2026-10-23 | Lo compartido se copia antes de elegir destino | Las URIs recibidas pueden vencer; garantía 10 |
+| 2026-10-23 | Al completar un código se abre el visor directo | Lo más rápido para el caso típico (fotos de apuntes); el detalle queda a un toque |
+| 2026-10-23 | Pares confundibles U/V, M/N, G/6, Q/9, T/7, A/4 para sugerencias | Los más confundibles ya están fuera del alfabeto |
+| 2026-10-23 | Borrar elementos sueltos con deshacer (esquema v4) | Caso real (foto equivocada); estrena el circuito de migraciones con test |
+| 2026-10-23 | telephoto para el zoom | Carga a resolución completa por partes; ~80 KB medidos en release |
+| 2026-10-25 | Guía única en `AGENTS.md`; soporte para Antigravity (`.agents/`) | El usuario sigue el proyecto con Antigravity; `CLAUDE.md` la importa |
