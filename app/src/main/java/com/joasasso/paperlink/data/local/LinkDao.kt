@@ -5,7 +5,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.joasasso.paperlink.data.backup.MergeCounts
 import kotlinx.coroutines.flow.Flow
+import kotlin.math.max
 
 /**
  * Acceso a [Link] y [Attachment]. Las lecturas excluyen los códigos con borrado lógico; los
@@ -137,5 +139,67 @@ interface LinkDao {
         val paths = filesOfAttachmentsDeletedBefore(cutoff)
         deleteAttachmentsDeletedBefore(cutoff)
         return paths
+    }
+
+    // --- Respaldo ---
+
+    @Transaction
+    @Query("SELECT * FROM links WHERE deletedAt IS NULL ORDER BY createdAt ASC")
+    suspend fun getAllActiveLinks(): List<LinkWithAttachments>
+
+    @Query("SELECT * FROM links WHERE code = :code")
+    suspend fun getRawLink(code: String): Link?
+
+    @Query("SELECT * FROM attachments WHERE id = :id")
+    suspend fun getRawAttachment(id: String): Attachment?
+
+    /**
+     * Fusiona los códigos y attachments de un respaldo sin pisar los datos existentes (garantía 14).
+     * - Si el código no existe, se crea.
+     * - Si el código existe (y estaba borrado lógicamente, se restaura), conserva su etiqueta si ya
+     *   tenía una; si no tenía, adopta la del respaldo.
+     * - Cada attachment del respaldo cuyo `id` no exista se agrega al final del código (`maxPosition + 1`).
+     */
+    @Transaction
+    suspend fun mergeBackup(links: List<Link>, attachments: List<Attachment>): MergeCounts {
+        val attachmentsByCode = attachments.groupBy { it.linkCode }
+        var addedLinks = 0
+        var addedAttachments = 0
+
+        for (incoming in links) {
+            val existing = getRawLink(incoming.code)
+            if (existing == null) {
+                insertLinkOrIgnore(incoming.copy(deletedAt = null))
+                addedLinks++
+            } else {
+                if (existing.deletedAt != null) {
+                    restore(incoming.code)
+                    addedLinks++
+                }
+                if (existing.label == null && incoming.label != null) {
+                    updateLabel(incoming.code, incoming.label, max(existing.updatedAt, incoming.updatedAt))
+                }
+            }
+
+            val incomingAttachments = attachmentsByCode[incoming.code].orEmpty().sortedBy { it.position }
+            var addedForLink = 0
+            for (att in incomingAttachments) {
+                val existingAtt = getRawAttachment(att.id)
+                if (existingAtt == null) {
+                    val nextPos = maxPosition(incoming.code) + 1
+                    insertAttachments(listOf(att.copy(linkCode = incoming.code, position = nextPos, deletedAt = null)))
+                    addedAttachments++
+                    addedForLink++
+                } else if (existingAtt.deletedAt != null) {
+                    restoreAttachment(att.id)
+                    addedAttachments++
+                    addedForLink++
+                }
+            }
+            if (existing != null && addedForLink > 0) {
+                touch(incoming.code, max(existing.updatedAt, incoming.updatedAt))
+            }
+        }
+        return MergeCounts(addedLinks = addedLinks, addedAttachments = addedAttachments)
     }
 }

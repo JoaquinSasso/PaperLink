@@ -13,6 +13,7 @@ import android.system.OsConstants
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
+import com.joasasso.paperlink.data.backup.BackupException
 import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.util.log
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,6 +23,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -132,6 +134,84 @@ class AttachmentStore(
 
     suspend fun exists(relativePath: String): Boolean = withContext(ioDispatcher) {
         fileFor(relativePath).isFile
+    }
+
+    /**
+     * Devuelve true si el archivo existe en `media/` y su SHA-256 coincide con [expectedSha256]
+     * (si [expectedSha256] es null alcanza con que exista y no esté vacío).
+     */
+    suspend fun hasMatchingFile(relativePath: String, expectedSha256: String?): Boolean = withContext(ioDispatcher) {
+        val file = fileFor(relativePath)
+        if (!file.isFile) return@withContext false
+        if (expectedSha256 == null) return@withContext file.length() > 0
+        sha256Of(file).equals(expectedSha256, ignoreCase = true)
+    }
+
+    /** Lee los bytes de un archivo de `media/` en [ioDispatcher]. */
+    suspend fun readFile(relativePath: String, reader: suspend (InputStream) -> Unit) = withContext(ioDispatcher) {
+        FileInputStream(fileFor(relativePath)).buffered(BUFFER_SIZE).use { input ->
+            reader(input)
+        }
+    }
+
+    /**
+     * Restaura un archivo en [relativePath] verificando su [expectedSha256] antes de renombrarlo
+     * atómicamente. Si el archivo ya existe con el mismo hash no lo reescribe y devuelve false;
+     * si se escribió como nuevo devuelve true.
+     *
+     * @throws BackupException.CorruptBackup si el hash calculado no coincide con [expectedSha256].
+     * @throws ImportException.InsufficientSpace si falta espacio en disco.
+     */
+    suspend fun restoreFile(
+        relativePath: String,
+        expectedSha256: String?,
+        estimatedSize: Long?,
+        write: suspend (OutputStream) -> Unit,
+    ): Boolean = withContext(ioDispatcher) {
+        val target = fileFor(relativePath)
+        if (target.isFile) {
+            val matches = if (expectedSha256 == null) {
+                target.length() > 0
+            } else {
+                sha256Of(target).equals(expectedSha256, ignoreCase = true)
+            }
+            if (matches) return@withContext false
+        }
+        val estimated = estimatedSize ?: 0L
+        checkSpace(estimated)
+        if (!mediaDir.isDirectory && !mediaDir.mkdirs()) throw IOException("Cannot create $mediaDir")
+        val part = File(mediaDir, "${target.name}.restore$PART_SUFFIX")
+        try {
+            val written = writeSynced(part) { out -> write(out) }
+            if (expectedSha256 != null && !written.sha256.equals(expectedSha256, ignoreCase = true)) {
+                throw BackupException.CorruptBackup(
+                    "SHA-256 mismatch for $relativePath: expected $expectedSha256, got ${written.sha256}"
+                )
+            }
+            Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            true
+        } catch (t: Throwable) {
+            part.delete()
+            throw if (t.isNoSpaceLeft()) ImportException.InsufficientSpace(estimated, usableSpace(mediaDir), t) else t
+        }
+    }
+
+    /** Abre un `InputStream` de [uri] en [ioDispatcher] (para importar un ZIP elegido por el usuario). */
+    suspend fun <T> openInputStream(uri: Uri, reader: suspend (InputStream) -> T): T = withContext(ioDispatcher) {
+        openSource(uri).use { reader(it) }
+    }
+
+    /** Abre un `OutputStream` de [uri] en [ioDispatcher] (para exportar un ZIP elegido por el usuario). */
+    suspend fun openOutputStream(uri: Uri, writer: suspend (OutputStream) -> Unit) = withContext(ioDispatcher) {
+        val out = try {
+            context.contentResolver.openOutputStream(uri, "wt")
+                ?: context.contentResolver.openOutputStream(uri)
+        } catch (e: IOException) {
+            throw ImportException.SourceUnreadable(e)
+        } catch (e: SecurityException) {
+            throw ImportException.SourceUnreadable(e)
+        } ?: throw ImportException.SourceUnreadable(null)
+        out.use { writer(it) }
     }
 
     /** Archivo de una ruta relativa de `media/`. Solo valida el texto de la ruta: no toca el disco. */
@@ -318,6 +398,19 @@ class AttachmentStore(
             file.fd.sync()
         }
         return Written(dest.length(), digest.digest().toHex())
+    }
+
+    private fun sha256Of(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).buffered(BUFFER_SIZE).use { input ->
+            val buffer = ByteArray(BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().toHex()
     }
 
     companion object {

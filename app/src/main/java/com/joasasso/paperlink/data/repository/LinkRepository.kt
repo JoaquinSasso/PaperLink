@@ -1,6 +1,12 @@
 package com.joasasso.paperlink.data.repository
 
 import android.net.Uri
+import com.joasasso.paperlink.data.backup.BackupAttachment
+import com.joasasso.paperlink.data.backup.BackupException
+import com.joasasso.paperlink.data.backup.BackupLink
+import com.joasasso.paperlink.data.backup.BackupManifest
+import com.joasasso.paperlink.data.backup.MergeCounts
+import com.joasasso.paperlink.data.backup.toBackup
 import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.data.local.Link
@@ -207,6 +213,63 @@ class LinkRepository(
         purgeExpired()
         val removed = store.sweep(dao.allFilePaths().toSet(), clock())
         if (removed > 0) log("Maintenance removed $removed orphan files")
+    }
+
+    // --- Respaldo ---
+
+    /**
+     * Arma el snapshot de todos los códigos y attachments vigentes cuyos archivos están en disco.
+     */
+    suspend fun exportSnapshot(): BackupManifest {
+        val activeLinks = dao.getAllActiveLinks().map { it.visible() }
+        val links = mutableListOf<BackupLink>()
+        val attachments = mutableListOf<BackupAttachment>()
+        for (item in activeLinks) {
+            val validAttachments = item.attachments.filter { att ->
+                val available = isAvailable(att)
+                if (!available) log("Skipping missing file in backup: ${att.relativePath}")
+                available
+            }
+            if (validAttachments.isNotEmpty()) {
+                links += item.link.toBackup()
+                validAttachments.mapIndexedTo(attachments) { index, att ->
+                    att.copy(position = index).toBackup()
+                }
+            }
+        }
+        return BackupManifest(
+            createdAt = clock(),
+            links = links,
+            attachments = attachments,
+        )
+    }
+
+    /**
+     * Verifica que todos los archivos de [manifest] estén en disco con su SHA-256 correcto y
+     * fusiona las filas en una transacción. Si algo falla, borra [newlyRestoredPaths].
+     */
+    suspend fun commitBackup(manifest: BackupManifest, newlyRestoredPaths: List<String>): MergeCounts {
+        try {
+            manifest.validate()
+            for (att in manifest.attachments) {
+                val path = att.relativePath ?: continue
+                if (!store.hasMatchingFile(path, att.sha256)) {
+                    throw BackupException.CorruptBackup("Missing or corrupt file after restore: $path")
+                }
+            }
+            return dao.mergeBackup(
+                links = manifest.links.map { it.toEntity() },
+                attachments = manifest.attachments.map { it.toEntity() },
+            )
+        } catch (t: Throwable) {
+            discardFiles(newlyRestoredPaths)
+            throw t
+        }
+    }
+
+    /** Limpia archivos recién restaurados si la restauración se interrumpe antes de llegar a la base. */
+    suspend fun discardRestoredFiles(paths: List<String>) {
+        discardFiles(paths)
     }
 
     // --- Internos ---
