@@ -185,4 +185,45 @@
     <string name="detail_delete_code_text">Everything saved in it will be deleted. You can undo it for a few seconds.</string>
     <string name="detail_delete_item">Delete item</string>
     <string name="detail_item_deleted">Item deleted</string>
+
+    <!-- Fase 4: Respaldo -->
+    <string name="backup_title">Backup</string>
+    <string name="backup_drive_title">Google Drive</string>
+    <string name="backup_drive_description">Saves an incremental copy in the hidden app folder of your Google Drive. Without an account, PaperLink stays 100% offline.</string>
+    <string name="backup_drive_auto_switch">Daily automatic backup (Wi‑Fi)</string>
+    <string name="backup_drive_charging_switch">Only while charging</string>
+    <string name="backup_drive_last_summary">Last backup: %1$s · %2$s</string>
+    <string name="backup_drive_never">No backup yet</string>
+    <string name="backup_drive_now">Back up now</string>
+    <string name="backup_drive_restore">Restore from Google Drive</string>
+    <string name="backup_drive_reauthorize">Reconnect Google Drive</string>
+    <string name="backup_zip_title">Manual ZIP file</string>
+    <string name="backup_zip_description">Export all your codes and files to a single ZIP file, or import one to merge it without overwriting existing codes.</string>
+    <string name="backup_zip_export">Export ZIP</string>
+    <string name="backup_zip_import">Import ZIP</string>
+    <string name="backup_progress_exporting">Exporting backup…</string>
+    <string name="backup_progress_importing">Importing backup…</string>
+    <string name="backup_progress_uploading">Backing up to Google Drive…</string>
+    <string name="backup_progress_restoring">Restoring from Google Drive…</string>
+    <string name="backup_progress_checking">Checking Google Drive…</string>
+    <string name="backup_success_export">ZIP backup exported.</string>
+    <string name="backup_success_drive">Google Drive backup completed.</string>
+    <string name="backup_success_restore_up_to_date">Everything was already up to date.</string>
+    <string name="backup_success_restore_counts">Restored: %1$d new codes, %2$d new items.</string>
+    <string name="backup_found_dialog_title">Backup found in Google Drive</string>
+    <string name="backup_found_dialog_message">There is a backup from %1$s with %2$d codes (%3$s). Do you want to restore it now?</string>
+    <string name="backup_found_dialog_restore">Restore</string>
+    <string name="backup_found_dialog_skip">Not now</string>
+    <string name="home_restore_backup">Restore from backup</string>
+    <string name="home_backup_suggest_title">Back up your codes</string>
+    <string name="home_backup_suggest_body">Turn on Google Drive backup or export a ZIP so you do not lose your codes if you uninstall the app or change phones.</string>
+    <string name="home_backup_suggest_action">Set up</string>
+    <string name="home_backup_suggest_dismiss">Not now</string>
+    <string name="home_backup_reauth_warning">Google Drive access was revoked or expired. Tap to reconnect your backup.</string>
+    <string name="home_backup_stale_warning">No Google Drive backup in more than 7 days. Tap to check your backup.</string>
+    <string name="error_backup_invalid_archive">That file is not a valid PaperLink backup.</string>
+    <string name="error_backup_corrupt">The backup is incomplete or corrupted. Nothing was changed.</string>
+    <string name="error_backup_auth_required">Google Drive authorization is required to continue.</string>
+    <string name="error_backup_not_found">No backup was found in this Google Drive account.</string>
+    <string name="error_backup_network">Could not connect to Google Drive. Check your connection and try again.</string>
 </resources>

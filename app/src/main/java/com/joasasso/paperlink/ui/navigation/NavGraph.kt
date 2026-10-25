@@ -10,6 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.joasasso.paperlink.ui.screens.backup.BackupScreen
 import com.joasasso.paperlink.ui.screens.camera.CameraScreen
 import com.joasasso.paperlink.ui.screens.code.CodeScreen
 import com.joasasso.paperlink.ui.screens.detail.DetailScreen
@@ -21,6 +22,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable object HomeDestination
 @Serializable object OnboardingDestination
+@Serializable object BackupDestination
 
 /** @param appendTo código al que se agregan las fotos, o null para crear uno nuevo. */
 @Serializable data class CameraDestination(val appendTo: String? = null)
@@ -87,12 +89,19 @@ fun PaperLinkNavHost(
                 onOpenCode = { code -> navController.navigate(ViewerDestination(code)) },
                 onCodeCreated = { code -> navController.navigate(CodeDestination(code, justCreated = true)) },
                 onOpenCamera = { navController.navigate(CameraDestination()) },
+                onOpenBackup = { navController.navigate(BackupDestination) },
                 deletedCode = deletedCode,
                 onDeletedCodeHandled = { code ->
                     if (entry.savedStateHandle.get<String>(KEY_DELETED_CODE) == code) {
                         entry.savedStateHandle[KEY_DELETED_CODE] = null
                     }
                 },
+            )
+        }
+
+        composable<BackupDestination> {
+            BackupScreen(
+                onBack = { if (!navController.popBackStack()) goHome() },
             )
         }
 

@@ -3,6 +3,7 @@ package com.joasasso.paperlink.ui.screens.home
 import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,12 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -34,6 +40,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,7 +73,8 @@ import com.joasasso.paperlink.ui.theme.JetBrainsMono
 import java.io.File
 
 /**
- * Home: campo de código arriba (abre al cuarto carácter), búsqueda por etiqueta y recientes.
+ * Home: campo de código arriba (abre al cuarto carácter), búsqueda por etiqueta, recientes
+ * y acceso/avisos de respaldo.
  *
  * @param deletedCode código recién borrado desde su detalle, para ofrecer "Deshacer".
  */
@@ -75,6 +83,7 @@ fun HomeScreen(
     onOpenCode: (code: String) -> Unit,
     onCodeCreated: (code: String) -> Unit,
     onOpenCamera: () -> Unit,
+    onOpenBackup: () -> Unit,
     deletedCode: String?,
     onDeletedCodeHandled: (code: String) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
@@ -85,6 +94,7 @@ fun HomeScreen(
     val events by viewModel.events.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val results by viewModel.searchResults.collectAsStateWithLifecycle()
+    val backupBanner by viewModel.backupBanner.collectAsStateWithLifecycle()
     val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
@@ -131,7 +141,7 @@ fun HomeScreen(
         val list = results ?: recent
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
@@ -140,7 +150,22 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.home_enter_code), style = MaterialTheme.typography.titleMedium)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = stringResource(R.string.home_enter_code),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                        IconButton(
+                            onClick = onOpenBackup,
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CloudUpload,
+                                contentDescription = stringResource(R.string.backup_title),
+                            )
+                        }
+                    }
                     CodeInputField(
                         value = code,
                         onValueChange = viewModel::onCodeChange,
@@ -165,6 +190,20 @@ fun HomeScreen(
                     )
                 }
             }
+            backupBanner?.let { banner ->
+                item {
+                    HomeBackupBanner(
+                        banner = banner,
+                        onOpenBackup = {
+                            if (banner is HomeViewModel.BackupBanner.SuggestEnable) {
+                                viewModel.dismissBackupSuggestion()
+                            }
+                            onOpenBackup()
+                        },
+                        onDismissSuggestion = viewModel::dismissBackupSuggestion,
+                    )
+                }
+            }
             item {
                 Text(
                     text = stringResource(if (results != null) R.string.home_results else R.string.home_recent),
@@ -178,12 +217,22 @@ fun HomeScreen(
                     CircularProgressIndicator(Modifier.padding(24.dp))
                 }
                 list.isEmpty() -> item {
-                    Text(
-                        text = stringResource(if (results != null) R.string.home_no_results else R.string.home_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    )
+                    ) {
+                        Text(
+                            text = stringResource(if (results != null) R.string.home_no_results else R.string.home_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (results == null) {
+                            OutlinedButton(onClick = onOpenBackup) {
+                                Text(stringResource(R.string.home_restore_backup))
+                            }
+                        }
+                    }
                 }
                 else -> items(list, key = { it.link.code }) { item ->
                     LinkRow(item, fileFor = viewModel::fileFor, onClick = { viewModel.open(item.link.code) })
@@ -199,6 +248,81 @@ fun HomeScreen(
         onSources = viewModel::create,
     )
     importStatus?.let { ImportProgressDialog(it.progress, onCancel = viewModel.importer::cancel) }
+}
+
+@Composable
+private fun HomeBackupBanner(
+    banner: HomeViewModel.BackupBanner,
+    onOpenBackup: () -> Unit,
+    onDismissSuggestion: () -> Unit,
+) {
+    when (banner) {
+        HomeViewModel.BackupBanner.NeedsReauth,
+        HomeViewModel.BackupBanner.Stale -> {
+            val warningRes = if (banner is HomeViewModel.BackupBanner.NeedsReauth) {
+                R.string.home_backup_reauth_warning
+            } else {
+                R.string.home_backup_stale_warning
+            }
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .clickable(onClick = onOpenBackup),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        text = stringResource(warningRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+            }
+        }
+        HomeViewModel.BackupBanner.SuggestEnable -> {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_backup_suggest_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = stringResource(R.string.home_backup_suggest_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = onDismissSuggestion) {
+                            Text(stringResource(R.string.home_backup_suggest_dismiss))
+                        }
+                        TextButton(onClick = onOpenBackup) {
+                            Text(stringResource(R.string.home_backup_suggest_action))
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

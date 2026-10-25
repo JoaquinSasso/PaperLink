@@ -12,6 +12,7 @@ import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.data.local.LinkWithAttachments
+import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import com.joasasso.paperlink.data.repository.AttachmentSource
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -34,19 +36,34 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * Home: campo de código (abre al cuarto carácter), recientes y búsqueda por etiqueta.
+ * Home: campo de código (abre al cuarto carácter), recientes, búsqueda por etiqueta
+ * y avisos de respaldo (garantías 13 y 15).
  * Lo escrito en el campo y en la búsqueda vive en [SavedStateHandle].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val handle: SavedStateHandle,
     private val repository: LinkRepository,
+    private val preferences: UserPreferencesRepository? = null,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
 
     /** Resultado de buscar el código escrito. */
     sealed interface Lookup {
         data object Idle : Lookup
         data class NotFound(val code: String, val hasInvalidChars: Boolean, val suggestions: List<String>) : Lookup
+    }
+
+    /** Aviso o sugerencia de respaldo en la Home (garantías 13 y 15). */
+    sealed interface BackupBanner {
+        /** El acceso a Google Drive fue revocado o venció (garantía 13). */
+        data object NeedsReauth : BackupBanner
+
+        /** Pasaron más de 7 días desde el último respaldo exitoso (garantía 13). */
+        data object Stale : BackupBanner
+
+        /** Se llegó a los primeros 5 códigos sin respaldo activo (garantía 15). */
+        data object SuggestEnable : BackupBanner
     }
 
     data class Events(
@@ -74,6 +91,19 @@ class HomeViewModel(
     val searchResults: StateFlow<List<LinkWithAttachments>?> = query
         .flatMapLatest { q -> if (q.isBlank()) flowOf(null) else repository.searchByLabel(q) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = null)
+
+    val backupBanner: StateFlow<BackupBanner?> = if (preferences != null) {
+        combine(preferences.backupSettings, repository.observeCount()) { settings, count ->
+            when {
+                settings.driveNeedsReauth -> BackupBanner.NeedsReauth
+                settings.isStale(clock()) -> BackupBanner.Stale
+                settings.shouldSuggestBackup(count) -> BackupBanner.SuggestEnable
+                else -> null
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = null)
+    } else {
+        flowOf(null).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = null)
+    }
 
     val importer = ContentImporter(viewModelScope, repository)
 
@@ -122,6 +152,12 @@ class HomeViewModel(
         }
     }
 
+    fun dismissBackupSuggestion() {
+        viewModelScope.launch {
+            preferences?.dismissBackupSuggestion()
+        }
+    }
+
     fun fileFor(attachment: Attachment): File? = repository.fileFor(attachment)
 
     fun onOpenHandled() = _events.update { it.copy(open = null) }
@@ -153,7 +189,11 @@ class HomeViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as PaperLinkApp
-                HomeViewModel(createSavedStateHandle(), app.container.linkRepository)
+                HomeViewModel(
+                    handle = createSavedStateHandle(),
+                    repository = app.container.linkRepository,
+                    preferences = app.container.userPreferencesRepository,
+                )
             }
         }
     }

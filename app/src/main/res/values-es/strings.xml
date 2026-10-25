@@ -185,4 +185,45 @@
     <string name="detail_delete_code_text">Se borra todo lo guardado en él. Vas a poder deshacerlo por unos segundos.</string>
     <string name="detail_delete_item">Borrar elemento</string>
     <string name="detail_item_deleted">Elemento borrado</string>
+
+    <!-- Fase 4: Respaldo -->
+    <string name="backup_title">Respaldo</string>
+    <string name="backup_drive_title">Google Drive</string>
+    <string name="backup_drive_description">Guarda una copia incremental en la carpeta oculta de la app en tu Google Drive. Sin cuenta, PaperLink es 100% offline.</string>
+    <string name="backup_drive_auto_switch">Respaldo automático diario (Wi‑Fi)</string>
+    <string name="backup_drive_charging_switch">Solo mientras carga</string>
+    <string name="backup_drive_last_summary">Último respaldo: %1$s · %2$s</string>
+    <string name="backup_drive_never">Todavía no hay respaldos</string>
+    <string name="backup_drive_now">Respaldar ahora</string>
+    <string name="backup_drive_restore">Restaurar desde Google Drive</string>
+    <string name="backup_drive_reauthorize">Volver a conectar Google Drive</string>
+    <string name="backup_zip_title">Archivo ZIP manual</string>
+    <string name="backup_zip_description">Exportá todos tus códigos y archivos en un único ZIP, o importá uno para sumarlo sin pisar lo que ya tenés.</string>
+    <string name="backup_zip_export">Exportar ZIP</string>
+    <string name="backup_zip_import">Importar ZIP</string>
+    <string name="backup_progress_exporting">Exportando respaldo…</string>
+    <string name="backup_progress_importing">Importando respaldo…</string>
+    <string name="backup_progress_uploading">Respaldando en Google Drive…</string>
+    <string name="backup_progress_restoring">Restaurando desde Google Drive…</string>
+    <string name="backup_progress_checking">Consultando Google Drive…</string>
+    <string name="backup_success_export">Respaldo ZIP exportado.</string>
+    <string name="backup_success_drive">Respaldo en Google Drive completado.</string>
+    <string name="backup_success_restore_up_to_date">Ya estaba todo al día.</string>
+    <string name="backup_success_restore_counts">Restaurado: %1$d códigos nuevos y %2$d elementos nuevos.</string>
+    <string name="backup_found_dialog_title">Respaldo encontrado en Google Drive</string>
+    <string name="backup_found_dialog_message">Hay un respaldo del %1$s con %2$d códigos (%3$s). ¿Querés restaurarlo ahora?</string>
+    <string name="backup_found_dialog_restore">Restaurar</string>
+    <string name="backup_found_dialog_skip">Ahora no</string>
+    <string name="home_restore_backup">Restaurar respaldo</string>
+    <string name="home_backup_suggest_title">Respaldá tus códigos</string>
+    <string name="home_backup_suggest_body">Activá el respaldo en Google Drive o exportá un ZIP para no perder tus códigos si desinstalás la app o cambiás de teléfono.</string>
+    <string name="home_backup_suggest_action">Configurar</string>
+    <string name="home_backup_suggest_dismiss">Ahora no</string>
+    <string name="home_backup_reauth_warning">Se revocó o venció el permiso de Google Drive. Tocá para reconectar el respaldo.</string>
+    <string name="home_backup_stale_warning">Hace más de 7 días que no se respalda en Google Drive. Tocá para revisar el respaldo.</string>
+    <string name="error_backup_invalid_archive">Ese archivo no es un respaldo válido de PaperLink.</string>
+    <string name="error_backup_corrupt">El respaldo está incompleto o dañado. No se modificó nada.</string>
+    <string name="error_backup_auth_required">Hace falta autorizar el acceso a Google Drive para continuar.</string>
+    <string name="error_backup_not_found">No se encontró ningún respaldo en esta cuenta de Google Drive.</string>
+    <string name="error_backup_network">No se pudo conectar con Google Drive. Revisá tu conexión y volvé a intentar.</string>
 </resources>
