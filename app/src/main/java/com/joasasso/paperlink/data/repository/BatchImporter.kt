@@ -33,10 +33,10 @@ import java.util.concurrent.ConcurrentHashMap
  * Guarda varios elementos de una vez (por ejemplo, 25 fotos de la galería) sin hacer esperar:
  *
  * - Importa hasta [parallelism] archivos a la vez (re-codificar fotos es lo lento).
- * - Al crear un código, apenas el primer elemento queda guardado se crea el código y se devuelve:
- *   la pantalla del código aparece enseguida (y el código ya existe en la base, garantía 8).
- * - El resto se agrega en segundo plano, en el orden elegido, en [scope] (sobrevive a salir de la
- *   pantalla). [statuses] expone el progreso para mostrarlo.
+ * - Al crear un código, el código se guarda vacío antes de importar nada y se devuelve: la pantalla
+ *   del código aparece al instante (el código ya existe en la base, garantía 8).
+ * - Los elementos se agregan en segundo plano, en el orden elegido, en [scope] (sobrevive a salir de
+ *   la pantalla). [statuses] expone el progreso para mostrarlo.
  * - Las cargas en curso se anotan en preferencias: si el proceso muere a mitad, al volver se avisa
  *   cuántos elementos no se llegaron a guardar (ver [UserPreferencesRepository.pendingImports]).
  */
@@ -68,69 +68,25 @@ class BatchImporter(
     fun status(code: String): Flow<Status?> = statuses.map { it[code] }.distinctUntilChanged()
 
     /**
-     * Guarda [sources] en un código nuevo ([appendTo] null) o existente.
+     * Guarda [sources] en un código nuevo ([appendTo] null) o existente y devuelve el código enseguida.
      *
-     * - Código nuevo: suspende hasta que el primer elemento que se pueda guardar crea el código, y
-     *   lo devuelve; el resto sigue en segundo plano. [onFirstProgress] informa el progreso de esa
-     *   primera parte (útil para un video grande).
-     * - Código existente: devuelve enseguida; todo se agrega en segundo plano.
-     *
-     * Cancelar la llamada mientras espera el primer elemento cancela toda la carga.
-     *
-     * @throws Exception el error del último elemento si no se pudo guardar ninguno (no se crea nada).
+     * El código nuevo se crea vacío antes de importar nada (unos milisegundos), así el usuario lo
+     * anota mientras los elementos llegan en segundo plano, en el orden elegido. Si no se pudiera
+     * guardar ninguno, el código queda (ya está anotado) y [statuses] lo informa para agregarlos de nuevo.
      */
-    suspend fun start(
-        sources: List<AttachmentSource>,
-        appendTo: String? = null,
-        onFirstProgress: (ImportProgress) -> Unit = {},
-    ): String {
+    suspend fun start(sources: List<AttachmentSource>, appendTo: String? = null): String {
         require(sources.isNotEmpty()) { "Nothing to import" }
         val startedAt = System.currentTimeMillis()
+        val code = appendTo ?: repository.createEmptyLink()
+        log("Batch: code ready after ${System.currentTimeMillis() - startedAt} ms (${sources.size} items)")
+
         val batchJob = SupervisorJob(scope.coroutineContext[Job])
         val batchScope = CoroutineScope(scope.coroutineContext + batchJob)
-        val fileCount = sources.count { it is AttachmentSource.Content }
         val prepared: List<Deferred<Result<AttachmentSource>>> = sources.mapIndexed { index, source ->
-            batchScope.async {
-                semaphore.withPermit { prepare(source, index, fileCount, if (index == 0) onFirstProgress else null) }
-            }
+            batchScope.async { semaphore.withPermit { prepare(source, index) } }
         }
-
-        if (appendTo != null) {
-            runInBackground(batchScope, batchJob, appendTo, prepared, from = 0, alreadySaved = 0, alreadyFailed = 0, startedAt)
-            return appendTo
-        }
-
-        var failed = 0
-        var lastError: Throwable? = null
-        try {
-            for ((index, deferred) in prepared.withIndex()) {
-                val result = deferred.await()
-                val source = result.getOrElse { error ->
-                    failed++
-                    lastError = error
-                    null
-                } ?: continue
-                val code = try {
-                    repository.createLink(listOf(source))
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    discard(source)
-                    failed++
-                    lastError = e
-                    continue
-                }
-                log("Batch: code ready after ${System.currentTimeMillis() - startedAt} ms (${sources.size} items)")
-                runInBackground(batchScope, batchJob, code, prepared, from = index + 1, alreadySaved = 1, alreadyFailed = failed, startedAt)
-                return code
-            }
-        } catch (e: CancellationException) {
-            batchJob.cancel()
-            withContext(NonCancellable) { discardCompleted(prepared) }
-            throw e
-        }
-        batchJob.cancel()
-        throw lastError ?: IllegalStateException("Nothing could be imported")
+        runInBackground(batchScope, batchJob, code, prepared, startedAt)
+        return code
     }
 
     /** Cancela las cargas en segundo plano de [code]. Lo ya guardado queda. */
@@ -148,27 +104,15 @@ class BatchImporter(
         batchJob: CompletableJob,
         code: String,
         prepared: List<Deferred<Result<AttachmentSource>>>,
-        from: Int,
-        alreadySaved: Int,
-        alreadyFailed: Int,
         startedAt: Long,
     ) {
-        val remaining = prepared.size - from
-        if (remaining <= 0) {
-            batchJob.complete()
-            if (alreadyFailed > 0) {
-                _statuses.update { it + (code to Status(code, prepared.size, alreadySaved, alreadyFailed, running = false)) }
-            }
-            return
-        }
         updateStatus(code) { old ->
-            old?.copy(total = old.total + prepared.size, saved = old.saved + alreadySaved, failed = old.failed + alreadyFailed, running = true)
-                ?: Status(code, prepared.size, alreadySaved, alreadyFailed, running = true)
+            old?.copy(total = old.total + prepared.size, running = true) ?: Status(code, prepared.size, 0, 0, running = true)
         }
         // LAZY: se registra antes de arrancar, así `finish` siempre lo encuentra.
         val job = batchScope.launch(start = CoroutineStart.LAZY) {
             val self = coroutineContext[Job]
-            var next = from
+            var next = 0
             try {
                 // Dentro del try: si la cancelación llega acá, el finally igual cierra la carga.
                 persistPending()
@@ -212,18 +156,11 @@ class BatchImporter(
     }
 
     /** Importa un archivo (o deja pasar un link o una nota). Los errores se devuelven, no se lanzan. */
-    private suspend fun prepare(
-        source: AttachmentSource,
-        index: Int,
-        fileCount: Int,
-        onProgress: ((ImportProgress) -> Unit)?,
-    ): Result<AttachmentSource> =
+    private suspend fun prepare(source: AttachmentSource, index: Int): Result<AttachmentSource> =
         try {
             Result.success(
                 when (source) {
-                    is AttachmentSource.Content -> AttachmentSource.Stored(
-                        store.import(source.uri) { copied, total -> onProgress?.invoke(ImportProgress(index, fileCount, copied, total)) }
-                    )
+                    is AttachmentSource.Content -> AttachmentSource.Stored(store.import(source.uri))
                     else -> source
                 }
             )

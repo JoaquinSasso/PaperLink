@@ -142,6 +142,21 @@ class LinkRepository(
         }
     }
 
+    /**
+     * Crea un código sin elementos: sus elementos llegan después (por ejemplo, fotos de la galería
+     * en segundo plano), así el usuario puede anotarlo enseguida. El código ya queda guardado.
+     * Mismo reintento ante choque que [createLink].
+     */
+    suspend fun createEmptyLink(): String {
+        val now = clock()
+        repeat(CodeAlphabet.MAX_RETRIES) {
+            val code = CodeAlphabet.generate(random)
+            if (dao.insertLinkOrIgnore(Link(code, null, createdAt = now, updatedAt = now, deletedAt = null)) != -1L) return code
+            log("Code collision, retrying")
+        }
+        throw CodeSpaceExhaustedException()
+    }
+
     /** Agrega [sources] al final de un código existente. */
     suspend fun addAttachments(
         code: String,
@@ -234,7 +249,9 @@ class LinkRepository(
                 if (!available) log("Skipping missing file in backup: ${att.relativePath}")
                 available
             }
-            if (validAttachments.isNotEmpty()) {
+            // También los códigos sin elementos: el código está anotado en papel y debe seguir
+            // reservado después de restaurar.
+            run {
                 links += item.link.toBackup()
                 validAttachments.mapIndexedTo(attachments) { index, att ->
                     att.copy(position = index).toBackup()

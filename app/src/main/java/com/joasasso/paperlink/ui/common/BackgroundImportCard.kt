@@ -46,13 +46,18 @@ fun BackgroundImportCard(
             val text = when {
                 status.running && showCode -> stringResource(R.string.import_bg_progress_code, status.code, status.done, status.total)
                 status.running -> stringResource(R.string.import_bg_progress, status.done, status.total)
+                // No se guardó nada: el código existe (ya está anotado) y hay que volver a agregarlos.
+                status.saved == 0 -> stringResource(R.string.import_bg_all_failed, status.code, status.total)
                 showCode -> stringResource(R.string.import_bg_failed_code, status.code, status.failed, status.total)
                 else -> stringResource(R.string.import_bg_failed, status.failed, status.total)
             }
             Text(text, style = MaterialTheme.typography.bodyMedium)
-            if (status.running) {
+            if (status.running && status.done == 0) {
+                // Todavía no terminó ninguno (por ejemplo, un video grande): barra sin porcentaje.
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else if (status.running) {
                 LinearProgressIndicator(
-                    progress = { if (status.total > 0) status.done.toFloat() / status.total else 0f },
+                    progress = { status.done.toFloat() / status.total },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

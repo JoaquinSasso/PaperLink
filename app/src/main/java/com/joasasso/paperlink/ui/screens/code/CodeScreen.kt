@@ -47,7 +47,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.ui.common.AddContentSheet
 import com.joasasso.paperlink.ui.common.BackgroundImportCard
-import com.joasasso.paperlink.ui.common.ImportProgressDialog
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 
 /**
@@ -61,7 +60,6 @@ fun CodeScreen(
 ) {
     val link by viewModel.link.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
     val backgroundImport by viewModel.backgroundImport.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val haptics = LocalHapticFeedback.current
@@ -169,5 +167,4 @@ fun CodeScreen(
         onCamera = { viewModel.saveLabel { onAddWithCamera(viewModel.code) } },
         onSources = viewModel::add,
     )
-    importStatus?.let { ImportProgressDialog(it.progress, onCancel = viewModel.importer::cancel) }
 }

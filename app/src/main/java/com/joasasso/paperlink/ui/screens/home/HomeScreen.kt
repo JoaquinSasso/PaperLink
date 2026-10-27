@@ -70,7 +70,6 @@ import com.joasasso.paperlink.ui.common.AttachmentThumbnail
 import com.joasasso.paperlink.ui.common.BackgroundImportCard
 import com.joasasso.paperlink.ui.common.InterruptedImportCard
 import com.joasasso.paperlink.ui.common.CodeInputField
-import com.joasasso.paperlink.ui.common.ImportProgressDialog
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 import java.io.File
 
@@ -97,7 +96,6 @@ fun HomeScreen(
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val results by viewModel.searchResults.collectAsStateWithLifecycle()
     val backupBanner by viewModel.backupBanner.collectAsStateWithLifecycle()
-    val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
     val backgroundImports by viewModel.backgroundImports.collectAsStateWithLifecycle()
     val interruptedImports by viewModel.interruptedImports.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -262,7 +260,6 @@ fun HomeScreen(
         onCamera = onOpenCamera,
         onSources = viewModel::create,
     )
-    importStatus?.let { ImportProgressDialog(it.progress, onCancel = viewModel.importer::cancel) }
 }
 
 @Composable

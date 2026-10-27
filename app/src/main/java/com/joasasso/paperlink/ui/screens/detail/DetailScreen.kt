@@ -63,7 +63,6 @@ import com.joasasso.paperlink.data.local.Attachment.Kind
 import com.joasasso.paperlink.ui.common.AddContentSheet
 import com.joasasso.paperlink.ui.common.AttachmentThumbnail
 import com.joasasso.paperlink.ui.common.BackgroundImportCard
-import com.joasasso.paperlink.ui.common.ImportProgressDialog
 import com.joasasso.paperlink.ui.common.labelRes
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 
@@ -78,7 +77,6 @@ fun DetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ui by viewModel.ui.collectAsStateWithLifecycle()
-    val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
     val backgroundImport by viewModel.backgroundImport.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
@@ -208,7 +206,6 @@ fun DetailScreen(
         onCamera = { onAddWithCamera(viewModel.code) },
         onSources = viewModel::add,
     )
-    importStatus?.let { ImportProgressDialog(it.progress, onCancel = viewModel.importer::cancel) }
 }
 
 @Composable

@@ -84,6 +84,36 @@ class LinkRepositoryTest {
     }
 
     @Test
+    fun createEmptyLink_savesACodeWithoutItems() = runBlocking {
+        val repo = repository()
+
+        val code = repo.createEmptyLink()
+
+        assertTrue(CodeAlphabet.isValid(code))
+        assertTrue(repo.getLink(code)!!.attachments.isEmpty())
+        // Los elementos se agregan después.
+        repo.addAttachments(code, listOf(AttachmentSource.Note("después")))
+        assertEquals(1, repo.getLink(code)!!.attachments.size)
+    }
+
+    @Test
+    fun emptyCode_isIncludedInBackupSnapshot() = runBlocking {
+        val repo = repository()
+        val code = repo.createEmptyLink()
+
+        // Sigue reservado después de restaurar: el código está anotado en papel.
+        assertEquals(listOf(code), repo.exportSnapshot().links.map { it.code })
+    }
+
+    @Test
+    fun createEmptyLink_retriesOnCollision() = runBlocking {
+        val first = repository(Random(7)).createEmptyLink()
+        val second = repository(Random(7)).createEmptyLink()
+
+        assertNotEquals(first, second)
+    }
+
+    @Test
     fun createLink_lookupIsCaseInsensitive() = runBlocking {
         val repo = repository()
         val code = repo.createLink(listOf(AttachmentSource.Note("x")))

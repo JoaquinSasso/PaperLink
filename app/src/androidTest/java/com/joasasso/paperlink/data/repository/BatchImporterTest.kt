@@ -6,7 +6,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.joasasso.paperlink.TestDir
 import com.joasasso.paperlink.data.files.AttachmentStore
-import com.joasasso.paperlink.data.files.ImportException
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +19,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -110,16 +108,32 @@ class BatchImporterTest {
     }
 
     @Test
-    fun nothingImportable_throws_andCreatesNothing() = runBlocking {
+    fun nothingImportable_leavesTheCodeEmpty_andReportsEveryFailure() = runBlocking {
         val importer = importer()
-        try {
-            importer.start(listOf(AttachmentSource.Content(dir.missingSource("a.pdf")), AttachmentSource.Content(dir.missingSource("b.pdf"))))
-            fail("Expected SourceUnreadable")
-        } catch (_: ImportException.SourceUnreadable) {
-            // esperado
-        }
-        assertEquals(emptyList<String>(), repository.allCodes())
+
+        val code = importer.start(listOf(AttachmentSource.Content(dir.missingSource("a.pdf")), AttachmentSource.Content(dir.missingSource("b.pdf"))))
+
+        // El código ya estaba anotado: queda, vacío, y se informa que no se guardó nada.
+        val status = importer.awaitFinished(code)!!
+        assertEquals(0, status.saved)
+        assertEquals(2, status.failed)
+        assertEquals(listOf(code), repository.allCodes())
+        assertTrue(repository.getLink(code)!!.attachments.isEmpty())
         assertTrue(dir.mediaFiles().isEmpty())
+    }
+
+    @Test
+    fun newCode_isReturnedBeforeItsItemsArrive() = runBlocking {
+        val importer = importer(parallelism = 1)
+
+        val code = importer.start((0 until 4).map { file(it, size = 6_000_000) })
+
+        // El código existe enseguida, aunque sus elementos sigan llegando.
+        val link = repository.getLink(code)
+        assertNotNull(link)
+        assertTrue("Todavía no llegaron todos", link!!.attachments.size < 4)
+        importer.awaitFinished(code)
+        assertEquals(4, repository.getLink(code)!!.attachments.size)
     }
 
     @Test

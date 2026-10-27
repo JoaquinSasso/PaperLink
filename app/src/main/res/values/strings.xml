@@ -237,5 +237,6 @@
     <string name="import_bg_progress_code">Saving to %1$s: %2$d of %3$d…</string>
     <string name="import_bg_failed">%1$d of %2$d items could not be saved.</string>
     <string name="import_bg_failed_code">%1$s: %2$d of %3$d items could not be saved.</string>
+    <string name="import_bg_all_failed">None of the %2$d items could be saved in %1$s. The code exists: add them again with Add more.</string>
     <string name="import_bg_interrupted">Saving to %1$s was interrupted: %2$d of %3$d items were saved. Add the missing ones from the code.</string>
 </resources>

@@ -237,5 +237,6 @@
     <string name="import_bg_progress_code">Guardando en %1$s: %2$d de %3$d…</string>
     <string name="import_bg_failed">No se pudieron guardar %1$d de %2$d elementos.</string>
     <string name="import_bg_failed_code">%1$s: no se pudieron guardar %2$d de %3$d elementos.</string>
+    <string name="import_bg_all_failed">No se pudo guardar ninguno de los %2$d elementos en %1$s. El código existe: volvé a agregarlos con «Agregar más».</string>
     <string name="import_bg_interrupted">Se cortó la carga en %1$s: se guardaron %2$d de %3$d elementos. Agregá los que faltan desde el código.</string>
 </resources>
