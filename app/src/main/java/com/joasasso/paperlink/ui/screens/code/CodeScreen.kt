@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.ui.common.AddContentSheet
+import com.joasasso.paperlink.ui.common.BackgroundImportCard
 import com.joasasso.paperlink.ui.common.ImportProgressDialog
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 
@@ -61,6 +62,7 @@ fun CodeScreen(
     val link by viewModel.link.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
+    val backgroundImport by viewModel.backgroundImport.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val haptics = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
@@ -126,6 +128,14 @@ fun CodeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                backgroundImport?.let { status ->
+                    BackgroundImportCard(
+                        status = status,
+                        showCode = false,
+                        onCancel = viewModel::cancelBackgroundImport,
+                        onAcknowledge = viewModel::acknowledgeBackgroundImport,
+                    )
+                }
                 OutlinedTextField(
                     value = state.label,
                     onValueChange = viewModel::onLabelChange,

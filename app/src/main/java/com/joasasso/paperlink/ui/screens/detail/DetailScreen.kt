@@ -62,6 +62,7 @@ import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.data.local.Attachment.Kind
 import com.joasasso.paperlink.ui.common.AddContentSheet
 import com.joasasso.paperlink.ui.common.AttachmentThumbnail
+import com.joasasso.paperlink.ui.common.BackgroundImportCard
 import com.joasasso.paperlink.ui.common.ImportProgressDialog
 import com.joasasso.paperlink.ui.common.labelRes
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
@@ -78,6 +79,7 @@ fun DetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
+    val backgroundImport by viewModel.backgroundImport.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
@@ -147,6 +149,16 @@ fun DetailScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                backgroundImport?.let { status ->
+                    item {
+                        BackgroundImportCard(
+                            status = status,
+                            showCode = false,
+                            onCancel = viewModel::cancelBackgroundImport,
+                            onAcknowledge = viewModel::acknowledgeBackgroundImport,
+                        )
+                    }
+                }
                 item {
                     OutlinedTextField(
                         value = ui.label,

@@ -105,7 +105,6 @@
     <string name="code_label_hint">Label (optional)</string>
     <string name="code_add_more">Add more</string>
     <string name="code_done">Done</string>
-    <string name="code_added">Added</string>
     <plurals name="code_attachment_count">
         <item quantity="one">%d item saved</item>
         <item quantity="other">%d items saved</item>
@@ -231,4 +230,12 @@
     <string name="error_backup_remote_not_merged">Google Drive has a backup that is not on this phone yet. Restore it first so nothing gets lost.</string>
     <string name="backup_remote_skipped">Nothing was backed up, so the backup in Google Drive stays as it is. Automatic backup turns on after you restore it.</string>
     <string name="home_backup_remote_pending_warning">Google Drive has a backup that is not on this phone. Automatic backup is paused until you restore it. Tap to open.</string>
+
+    <!-- Cargas en segundo plano -->
+    <string name="action_ok">OK</string>
+    <string name="import_bg_progress">Saving %1$d of %2$d…</string>
+    <string name="import_bg_progress_code">Saving to %1$s: %2$d of %3$d…</string>
+    <string name="import_bg_failed">%1$d of %2$d items could not be saved.</string>
+    <string name="import_bg_failed_code">%1$s: %2$d of %3$d items could not be saved.</string>
+    <string name="import_bg_interrupted">Saving to %1$s was interrupted: %2$d of %3$d items were saved. Add the missing ones from the code.</string>
 </resources>

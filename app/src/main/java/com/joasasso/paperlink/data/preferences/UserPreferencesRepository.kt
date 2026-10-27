@@ -13,6 +13,9 @@ import com.joasasso.paperlink.util.log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 import java.io.IOException
 
 private const val PREFERENCE_NAME = "paperlink_preferences"
@@ -58,6 +61,13 @@ data class BackupSettings(
     }
 }
 
+/**
+ * Carga en segundo plano todavía en curso para [code]. Si al iniciar la app queda alguna, es que el
+ * proceso murió a mitad de la carga y hay que avisarle al usuario.
+ */
+@Serializable
+data class PendingImport(val code: String, val total: Int, val saved: Int)
+
 class UserPreferencesRepository(
     private val dataStore: DataStore<Preferences>,
 ) {
@@ -74,7 +84,10 @@ class UserPreferencesRepository(
         val DRIVE_ENABLED_AT = longPreferencesKey("drive_enabled_at")
         val DRIVE_SYNCED_MANIFEST_ID = stringPreferencesKey("drive_synced_manifest_id")
         val DRIVE_REMOTE_PENDING = booleanPreferencesKey("drive_remote_pending")
+        val PENDING_IMPORTS = stringPreferencesKey("pending_imports")
     }
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val preferencesFlow: Flow<Preferences> = dataStore.data
         .catch { exception ->
@@ -102,6 +115,43 @@ class UserPreferencesRepository(
             syncedManifestId = preferences[PreferencesKeys.DRIVE_SYNCED_MANIFEST_ID],
             remotePending = preferences[PreferencesKeys.DRIVE_REMOTE_PENDING] ?: false,
         )
+    }
+
+    val pendingImports: Flow<List<PendingImport>> = preferencesFlow.map { preferences ->
+        decodePendingImports(preferences[PreferencesKeys.PENDING_IMPORTS])
+    }
+
+    /** Reemplaza la lista de cargas en curso (vacía = ninguna). */
+    suspend fun setPendingImports(imports: List<PendingImport>) {
+        dataStore.edit { preferences ->
+            if (imports.isEmpty()) {
+                preferences.remove(PreferencesKeys.PENDING_IMPORTS)
+            } else {
+                preferences[PreferencesKeys.PENDING_IMPORTS] = json.encodeToString(imports)
+            }
+        }
+    }
+
+    /** El usuario ya vio el aviso de la carga cortada de [code]. */
+    suspend fun dismissPendingImport(code: String) {
+        dataStore.edit { preferences ->
+            val remaining = decodePendingImports(preferences[PreferencesKeys.PENDING_IMPORTS]).filter { it.code != code }
+            if (remaining.isEmpty()) {
+                preferences.remove(PreferencesKeys.PENDING_IMPORTS)
+            } else {
+                preferences[PreferencesKeys.PENDING_IMPORTS] = json.encodeToString(remaining)
+            }
+        }
+    }
+
+    private fun decodePendingImports(value: String?): List<PendingImport> {
+        if (value.isNullOrBlank()) return emptyList()
+        return try {
+            json.decodeFromString(value)
+        } catch (e: SerializationException) {
+            log("Corrupt pending imports, ignored", e)
+            emptyList()
+        }
     }
 
     suspend fun setFirstLaunchCompleted() {

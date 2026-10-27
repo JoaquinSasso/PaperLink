@@ -13,7 +13,9 @@ import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.data.local.LinkWithAttachments
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
+import com.joasasso.paperlink.data.preferences.PendingImport
 import com.joasasso.paperlink.data.repository.AttachmentSource
+import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
 import com.joasasso.paperlink.domain.suggestCodes
@@ -26,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -44,6 +47,7 @@ import java.io.File
 class HomeViewModel(
     private val handle: SavedStateHandle,
     private val repository: LinkRepository,
+    private val batchImporter: BatchImporter,
     private val preferences: UserPreferencesRepository? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
@@ -109,7 +113,29 @@ class HomeViewModel(
         flowOf(null).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = null)
     }
 
-    val importer = ContentImporter(viewModelScope, repository)
+    val importer = ContentImporter(viewModelScope, batchImporter)
+
+    /** Cargas en segundo plano (en curso, o terminadas con fallas sin ver). */
+    val backgroundImports: StateFlow<List<BatchImporter.Status>> = batchImporter.statuses
+        .map { it.values.sortedBy { status -> status.code } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Cargas que quedaron anotadas sin terminar: la app se cerró a mitad. */
+    val interruptedImports: StateFlow<List<PendingImport>> = if (preferences != null) {
+        combine(preferences.pendingImports, batchImporter.statuses) { pending, running ->
+            pending.filter { it.code !in running }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    } else {
+        MutableStateFlow<List<PendingImport>>(emptyList()).asStateFlow()
+    }
+
+    fun cancelBackgroundImport(code: String) = batchImporter.cancel(code)
+
+    fun acknowledgeBackgroundImport(code: String) = batchImporter.acknowledge(code)
+
+    fun dismissInterruptedImport(code: String) {
+        viewModelScope.launch { preferences?.dismissPendingImport(code) }
+    }
 
     private var lookupJob: Job? = null
 
@@ -196,6 +222,7 @@ class HomeViewModel(
                 HomeViewModel(
                     handle = createSavedStateHandle(),
                     repository = app.container.linkRepository,
+                    batchImporter = app.container.batchImporter,
                     preferences = app.container.userPreferencesRepository,
                 )
             }

@@ -105,7 +105,6 @@
     <string name="code_label_hint">Etiqueta (opcional)</string>
     <string name="code_add_more">Agregar más</string>
     <string name="code_done">Listo</string>
-    <string name="code_added">Agregado</string>
     <plurals name="code_attachment_count">
         <item quantity="one">%d elemento guardado</item>
         <item quantity="other">%d elementos guardados</item>
@@ -231,4 +230,12 @@
     <string name="error_backup_remote_not_merged">Google Drive tiene un respaldo que todavía no está en este teléfono. Restauralo primero para no perder nada.</string>
     <string name="backup_remote_skipped">No se respaldó nada, así que el respaldo de Google Drive queda como está. El respaldo automático se activa cuando lo restaures.</string>
     <string name="home_backup_remote_pending_warning">Google Drive tiene un respaldo que no está en este teléfono. El respaldo automático está en pausa hasta que lo restaures. Tocá para abrir.</string>
+
+    <!-- Cargas en segundo plano -->
+    <string name="action_ok">Entendido</string>
+    <string name="import_bg_progress">Guardando %1$d de %2$d…</string>
+    <string name="import_bg_progress_code">Guardando en %1$s: %2$d de %3$d…</string>
+    <string name="import_bg_failed">No se pudieron guardar %1$d de %2$d elementos.</string>
+    <string name="import_bg_failed_code">%1$s: no se pudieron guardar %2$d de %3$d elementos.</string>
+    <string name="import_bg_interrupted">Se cortó la carga en %1$s: se guardaron %2$d de %3$d elementos. Agregá los que faltan desde el código.</string>
 </resources>

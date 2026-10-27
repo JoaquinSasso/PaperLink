@@ -1,5 +1,6 @@
 package com.joasasso.paperlink.di
 
+import android.app.ActivityManager
 import android.content.Context
 import com.joasasso.paperlink.data.backup.DriveAppDataClient
 import com.joasasso.paperlink.data.backup.DriveAuthManager
@@ -9,6 +10,7 @@ import com.joasasso.paperlink.data.backup.ZipBackupManager
 import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
+import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.util.log
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -37,6 +39,12 @@ class AppContainer(context: Context) {
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(context)
+    }
+
+    /** Cargas de varios elementos: 3 fotos a la vez (1 en teléfonos con poca RAM). */
+    val batchImporter: BatchImporter by lazy {
+        val lowRam = context.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true
+        BatchImporter(linkRepository, attachmentStore, userPreferencesRepository, applicationScope, parallelism = if (lowRam) 1 else 3)
     }
 
     val zipBackupManager: ZipBackupManager by lazy {

@@ -13,6 +13,7 @@ import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.LinkWithAttachments
 import com.joasasso.paperlink.data.repository.AttachmentSource
+import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.ui.common.ContentImporter
 import com.joasasso.paperlink.ui.common.messageRes
@@ -38,6 +39,7 @@ class CodeViewModel(
     val code: String,
     justCreated: Boolean,
     private val repository: LinkRepository,
+    private val batchImporter: BatchImporter,
 ) : ViewModel() {
 
     sealed interface LinkState {
@@ -59,7 +61,15 @@ class CodeViewModel(
     private val _state = MutableStateFlow(UiState(label = handle[KEY_LABEL] ?: ""))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    val importer = ContentImporter(viewModelScope, repository)
+    val importer = ContentImporter(viewModelScope, batchImporter)
+
+    /** Carga en segundo plano de este código (por ejemplo, el resto de las fotos elegidas). */
+    val backgroundImport: StateFlow<BatchImporter.Status?> = batchImporter.status(code)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun cancelBackgroundImport() = batchImporter.cancel(code)
+
+    fun acknowledgeBackgroundImport() = batchImporter.acknowledge(code)
 
     /** Vibrar una sola vez al mostrar un código recién creado, aunque la pantalla se recree. */
     var shouldConfirm: Boolean = justCreated && handle.get<Boolean>(KEY_CONFIRMED) != true
@@ -108,7 +118,8 @@ class CodeViewModel(
         importer.start(
             sources = sources,
             appendTo = code,
-            onSuccess = { _state.update { it.copy(message = R.string.code_added) } },
+            // El progreso se ve en la tarjeta de carga en segundo plano.
+            onSuccess = {},
             onError = { e -> _state.update { it.copy(message = e.messageRes()) } },
         )
     }
@@ -126,7 +137,7 @@ class CodeViewModel(
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as PaperLinkApp
                 val handle = createSavedStateHandle()
                 val route = handle.toRoute<CodeDestination>()
-                CodeViewModel(handle, route.code, route.justCreated, app.container.linkRepository)
+                CodeViewModel(handle, route.code, route.justCreated, app.container.linkRepository, app.container.batchImporter)
             }
         }
     }

@@ -13,6 +13,7 @@ import com.joasasso.paperlink.PaperLinkApp
 import com.joasasso.paperlink.R
 import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.data.repository.AttachmentSource
+import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkContent
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.ui.common.ContentImporter
@@ -41,6 +42,7 @@ class DetailViewModel(
     private val handle: SavedStateHandle,
     val code: String,
     private val repository: LinkRepository,
+    private val batchImporter: BatchImporter,
 ) : ViewModel() {
 
     sealed interface State {
@@ -65,7 +67,15 @@ class DetailViewModel(
     private val _ui = MutableStateFlow(UiState(label = handle[KEY_LABEL] ?: ""))
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
-    val importer = ContentImporter(viewModelScope, repository)
+    val importer = ContentImporter(viewModelScope, batchImporter)
+
+    /** Carga en segundo plano de este código. */
+    val backgroundImport: StateFlow<BatchImporter.Status?> = batchImporter.status(code)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun cancelBackgroundImport() = batchImporter.cancel(code)
+
+    fun acknowledgeBackgroundImport() = batchImporter.acknowledge(code)
 
     private var labelJob: Job? = null
 
@@ -95,7 +105,8 @@ class DetailViewModel(
         importer.start(
             sources = sources,
             appendTo = code,
-            onSuccess = { _ui.update { it.copy(message = R.string.code_added) } },
+            // El progreso se ve en la tarjeta de carga en segundo plano.
+            onSuccess = {},
             onError = { e -> _ui.update { it.copy(message = e.messageRes()) } },
         )
     }
@@ -153,7 +164,12 @@ class DetailViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as PaperLinkApp
                 val handle = createSavedStateHandle()
-                DetailViewModel(handle, handle.toRoute<DetailDestination>().code, app.container.linkRepository)
+                DetailViewModel(
+                    handle,
+                    handle.toRoute<DetailDestination>().code,
+                    app.container.linkRepository,
+                    app.container.batchImporter,
+                )
             }
         }
     }

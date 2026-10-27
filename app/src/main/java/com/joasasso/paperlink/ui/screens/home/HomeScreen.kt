@@ -67,6 +67,8 @@ import com.joasasso.paperlink.data.local.Attachment
 import com.joasasso.paperlink.data.local.LinkWithAttachments
 import com.joasasso.paperlink.ui.common.AddContentSheet
 import com.joasasso.paperlink.ui.common.AttachmentThumbnail
+import com.joasasso.paperlink.ui.common.BackgroundImportCard
+import com.joasasso.paperlink.ui.common.InterruptedImportCard
 import com.joasasso.paperlink.ui.common.CodeInputField
 import com.joasasso.paperlink.ui.common.ImportProgressDialog
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
@@ -96,6 +98,8 @@ fun HomeScreen(
     val results by viewModel.searchResults.collectAsStateWithLifecycle()
     val backupBanner by viewModel.backupBanner.collectAsStateWithLifecycle()
     val importStatus by viewModel.importer.status.collectAsStateWithLifecycle()
+    val backgroundImports by viewModel.backgroundImports.collectAsStateWithLifecycle()
+    val interruptedImports by viewModel.interruptedImports.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
 
@@ -189,6 +193,17 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+            }
+            items(backgroundImports, key = { "import-${it.code}" }) { status ->
+                BackgroundImportCard(
+                    status = status,
+                    showCode = true,
+                    onCancel = { viewModel.cancelBackgroundImport(status.code) },
+                    onAcknowledge = { viewModel.acknowledgeBackgroundImport(status.code) },
+                )
+            }
+            items(interruptedImports, key = { "interrupted-${it.code}" }) { pending ->
+                InterruptedImportCard(pending, onDismiss = { viewModel.dismissInterruptedImport(pending.code) })
             }
             backupBanner?.let { banner ->
                 item {
