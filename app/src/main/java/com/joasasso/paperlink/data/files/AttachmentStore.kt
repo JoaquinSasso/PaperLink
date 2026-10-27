@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import android.system.ErrnoException
 import android.system.OsConstants
@@ -63,9 +64,9 @@ class AttachmentStore(
     )
 
     /**
-     * Copia el contenido de [uri] a `media/`. Las imágenes se re-codifican a JPEG
-     * (lado mayor ≤ [IMAGE_MAX_SIDE_PX], orientación EXIF aplicada); si no se pueden decodificar
-     * se guarda el original. El resto se copia tal cual.
+     * Copia el contenido de [uri] a `media/`. Las imágenes se re-codifican a WebP con pérdida
+     * (lado mayor ≤ [IMAGE_MAX_SIDE_PX], calidad [IMAGE_QUALITY], orientación EXIF aplicada); si no
+     * se pueden decodificar se guarda el original. El resto se copia tal cual.
      *
      * Se cancela cancelando la corrutina. [onProgress] recibe bytes copiados y total (si se conoce).
      *
@@ -79,30 +80,30 @@ class AttachmentStore(
         val kind = kindForMimeType(mimeType)
         val declaredSize = querySize(uri)
         val reencode = kind == Attachment.Kind.IMAGE && mimeType != "image/gif"
-        // Re-codificar necesita espacio para el original y el JPEG a la vez.
+        // Re-codificar necesita espacio para el original y el re-codificado a la vez.
         val estimated = (declaredSize ?: 0L) * (if (reencode) 2 else 1)
         checkSpace(estimated)
 
         if (!mediaDir.isDirectory && !mediaDir.mkdirs()) throw IOException("Cannot create $mediaDir")
         val id = UUID.randomUUID().toString()
         val extension = extensionFor(mimeType, uri)
-        // Nombres distintos: si el original ya es JPEG, no debe pisarse con el re-codificado.
+        // Nombres distintos: si el original ya es WebP, no debe pisarse con el re-codificado.
         val originalPart = File(mediaDir, "$id.original$PART_SUFFIX")
-        val jpegPart = File(mediaDir, "$id.jpg$PART_SUFFIX")
+        val encodedPart = File(mediaDir, "$id.$IMAGE_EXTENSION$PART_SUFFIX")
         try {
             val original = copyFrom(uri, originalPart, declaredSize, onProgress)
             if (reencode) {
-                val jpeg = reencodeImage(originalPart, jpegPart)
-                if (jpeg != null) {
+                val encoded = reencodeImage(originalPart, encodedPart)
+                if (encoded != null) {
                     originalPart.delete()
-                    return@withContext commit(jpegPart, "$id.jpg", kind, "image/jpeg", jpeg)
+                    return@withContext commit(encodedPart, "$id.$IMAGE_EXTENSION", kind, IMAGE_MIME_TYPE, encoded)
                 }
                 log("Image not decodable, keeping original ($mimeType)")
             }
             commit(originalPart, "$id.$extension", kind, mimeType, original)
         } catch (t: Throwable) {
             originalPart.delete()
-            jpegPart.delete()
+            encodedPart.delete()
             throw if (t.isNoSpaceLeft()) ImportException.InsufficientSpace(estimated, usableSpace(mediaDir), t) else t
         }
     }
@@ -292,7 +293,7 @@ class AttachmentStore(
         } ?: throw ImportException.SourceUnreadable(null)
 
     /**
-     * Decodifica [source], aplica orientación EXIF, achica y escribe un JPEG en [dest].
+     * Decodifica [source], aplica orientación EXIF, achica y escribe un WebP en [dest].
      * Devuelve null si la imagen no se puede decodificar (formato no soportado o sin memoria).
      */
     private suspend fun reencodeImage(source: File, dest: File): Written? {
@@ -313,8 +314,8 @@ class AttachmentStore(
         currentCoroutineContext().ensureActive()
         return try {
             writeSynced(dest) { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)) {
-                    throw IOException("JPEG compression failed")
+                if (!bitmap.compress(webpLossy(), IMAGE_QUALITY, out)) {
+                    throw IOException("WebP compression failed")
                 }
             }
         } finally {
@@ -342,7 +343,8 @@ class AttachmentStore(
         if (transformed !== decoded) decoded.recycle()
         if (!transformed.hasAlpha()) return transformed
 
-        // JPEG no tiene transparencia: se compone sobre blanco en vez de dejar fondo negro.
+        // Las fotos de apuntes no necesitan transparencia: se compone sobre blanco (archivo más chico
+        // y sin fondo negro al verla en apps que no manejan alfa).
         val opaque = Bitmap.createBitmap(transformed.width, transformed.height, Bitmap.Config.ARGB_8888)
         Canvas(opaque).apply {
             drawColor(Color.WHITE)
@@ -421,8 +423,14 @@ class AttachmentStore(
         const val CAPTURES_DIR = "captures"
         const val CAPTURE_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
         const val PART_SUFFIX = ".part"
-        const val IMAGE_MAX_SIDE_PX = 3000
-        const val JPEG_QUALITY = 85
+        /**
+         * WebP 2400 px calidad 70: ~79 % menos que el JPEG 3000 px q85 anterior, con la letra
+         * manuscrita igual de legible al hacer zoom (prueba con fotos reales, ver docs/PLAN.md).
+         */
+        const val IMAGE_MAX_SIDE_PX = 2400
+        const val IMAGE_QUALITY = 70
+        const val IMAGE_EXTENSION = "webp"
+        const val IMAGE_MIME_TYPE = "image/webp"
         const val FREE_SPACE_MARGIN_BYTES = 50L * 1024 * 1024
         const val SWEEP_MIN_AGE_MS = 60L * 60 * 1000
         private const val BUFFER_SIZE = 64 * 1024
@@ -470,3 +478,8 @@ private fun Throwable.isNoSpaceLeft(): Boolean {
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+/** WebP con pérdida. Antes de Android 11 el formato `WEBP` es con pérdida si la calidad es menor a 100. */
+@Suppress("DEPRECATION")
+private fun webpLossy(): Bitmap.CompressFormat =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP

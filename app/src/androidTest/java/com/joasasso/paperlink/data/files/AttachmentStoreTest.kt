@@ -49,18 +49,30 @@ class AttachmentStoreTest {
     // --- Imágenes ---
 
     @Test
-    fun largeImage_isReencodedToJpegWithinMaxSide() = runBlocking {
+    fun largeImage_isReencodedToWebpWithinMaxSide() = runBlocking {
         val source = dir.image("big.png", 4000, 2000, Bitmap.CompressFormat.PNG)
 
         val result = store.import(Uri.fromFile(source))
 
         assertEquals(Kind.IMAGE, result.kind)
-        assertEquals("image/jpeg", result.mimeType)
-        assertTrue(result.relativePath.matches(Regex("media/[0-9a-f-]{36}\\.jpg")))
+        assertEquals("image/webp", result.mimeType)
+        assertTrue(result.relativePath.matches(Regex("media/[0-9a-f-]{36}\\.webp")))
         val bounds = decodeBounds(stored(result))
-        assertEquals(3000, bounds.outWidth)
-        assertEquals(1500, bounds.outHeight)
-        assertEquals("image/jpeg", bounds.outMimeType)
+        assertEquals(AttachmentStore.IMAGE_MAX_SIDE_PX, bounds.outWidth)
+        assertEquals(AttachmentStore.IMAGE_MAX_SIDE_PX / 2, bounds.outHeight)
+        assertEquals("image/webp", bounds.outMimeType)
+    }
+
+    @Test
+    fun webpSource_isReencodedWithoutClobberingItself() = runBlocking {
+        // El original y el re-codificado no pueden compartir el nombre del .part (bug de la fase 2 con JPEG).
+        val source = dir.image("photo.webp", 300, 200, Bitmap.CompressFormat.WEBP_LOSSY)
+
+        val result = store.import(Uri.fromFile(source))
+
+        assertEquals("image/webp", result.mimeType)
+        assertEquals(300, decodeBounds(stored(result)).outWidth)
+        assertEquals(listOf(stored(result).name), dir.mediaFiles().map { it.name })
     }
 
     @Test
@@ -79,7 +91,7 @@ class AttachmentStoreTest {
         assertEquals(400, bitmap.height)
         assertColorNear(Color.RED, bitmap.getPixel(100, 50))
         assertColorNear(Color.BLUE, bitmap.getPixel(100, 350))
-        // El JPEG resultante ya no lleva rotación pendiente.
+        // La imagen resultante ya no lleva rotación pendiente.
         assertEquals(0, ExifInterface(stored(result)).rotationDegrees)
     }
 
