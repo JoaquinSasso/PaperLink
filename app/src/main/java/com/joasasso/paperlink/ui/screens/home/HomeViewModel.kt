@@ -59,6 +59,9 @@ class HomeViewModel(
         /** El acceso a Google Drive fue revocado o venció (garantía 13). */
         data object NeedsReauth : BackupBanner
 
+        /** Drive tiene un respaldo sin fusionar y el respaldo automático está frenado. */
+        data object RemotePending : BackupBanner
+
         /** Pasaron más de 7 días desde el último respaldo exitoso (garantía 13). */
         data object Stale : BackupBanner
 
@@ -96,6 +99,7 @@ class HomeViewModel(
         combine(preferences.backupSettings, repository.observeCount()) { settings, count ->
             when {
                 settings.driveNeedsReauth -> BackupBanner.NeedsReauth
+                settings.remotePending -> BackupBanner.RemotePending
                 settings.isStale(clock()) -> BackupBanner.Stale
                 settings.shouldSuggestBackup(count) -> BackupBanner.SuggestEnable
                 else -> null

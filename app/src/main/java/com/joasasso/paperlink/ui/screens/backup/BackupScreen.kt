@@ -336,12 +336,11 @@ private fun RemoteBackupFoundDialog(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val dateText = DateUtils.getRelativeTimeSpanString(
+    val dateText = DateUtils.formatDateTime(
+        context,
         info.createdAt,
-        System.currentTimeMillis(),
-        DateUtils.MINUTE_IN_MILLIS,
-        DateUtils.FORMAT_ABBREV_RELATIVE,
-    ).toString()
+        DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH,
+    )
     val sizeText = Formatter.formatShortFileSize(context, info.totalSizeBytes)
     AlertDialog(
         onDismissRequest = onDismiss,

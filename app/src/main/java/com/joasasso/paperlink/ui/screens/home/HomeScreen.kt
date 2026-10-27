@@ -258,11 +258,12 @@ private fun HomeBackupBanner(
 ) {
     when (banner) {
         HomeViewModel.BackupBanner.NeedsReauth,
+        HomeViewModel.BackupBanner.RemotePending,
         HomeViewModel.BackupBanner.Stale -> {
-            val warningRes = if (banner is HomeViewModel.BackupBanner.NeedsReauth) {
-                R.string.home_backup_reauth_warning
-            } else {
-                R.string.home_backup_stale_warning
+            val warningRes = when (banner) {
+                HomeViewModel.BackupBanner.NeedsReauth -> R.string.home_backup_reauth_warning
+                HomeViewModel.BackupBanner.RemotePending -> R.string.home_backup_remote_pending_warning
+                else -> R.string.home_backup_stale_warning
             }
             ElevatedCard(
                 modifier = Modifier

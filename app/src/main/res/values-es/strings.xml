@@ -226,4 +226,9 @@
     <string name="error_backup_auth_required">Hace falta autorizar el acceso a Google Drive para continuar.</string>
     <string name="error_backup_not_found">No se encontró ningún respaldo en esta cuenta de Google Drive.</string>
     <string name="error_backup_network">No se pudo conectar con Google Drive. Revisá tu conexión y volvé a intentar.</string>
+
+    <!-- Respaldo: protección del respaldo de Drive -->
+    <string name="error_backup_remote_not_merged">Google Drive tiene un respaldo que todavía no está en este teléfono. Restauralo primero para no perder nada.</string>
+    <string name="backup_remote_skipped">No se respaldó nada, así que el respaldo de Google Drive queda como está. El respaldo automático se activa cuando lo restaures.</string>
+    <string name="home_backup_remote_pending_warning">Google Drive tiene un respaldo que no está en este teléfono. El respaldo automático está en pausa hasta que lo restaures. Tocá para abrir.</string>
 </resources>

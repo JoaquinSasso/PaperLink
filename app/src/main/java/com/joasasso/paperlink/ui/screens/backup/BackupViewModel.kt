@@ -22,7 +22,6 @@ import com.joasasso.paperlink.data.backup.RemoteBackupInfo
 import com.joasasso.paperlink.data.backup.ZipBackupManager
 import com.joasasso.paperlink.data.preferences.BackupSettings
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
-import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.ui.common.messageRes
 import com.joasasso.paperlink.util.log
 import kotlinx.coroutines.CancellationException
@@ -44,7 +43,6 @@ import kotlinx.coroutines.launch
  */
 class BackupViewModel(
     private val handle: SavedStateHandle,
-    private val repository: LinkRepository,
     private val preferences: UserPreferencesRepository,
     private val zipBackupManager: ZipBackupManager,
     private val driveAuthManager: DriveAuthManager,
@@ -149,9 +147,10 @@ class BackupViewModel(
         } ?: PendingDriveAction.CONNECT
 
         try {
-            val token = driveAuthManager.getTokenFromIntent(data)
+            // Guarda el token en el administrador de autorización para las llamadas siguientes.
+            driveAuthManager.getTokenFromIntent(data)
             when (action) {
-                PendingDriveAction.CONNECT -> completeConnectDrive(token)
+                PendingDriveAction.CONNECT -> completeConnectDrive()
                 PendingDriveAction.BACKUP_NOW -> backupToDriveNow()
                 PendingDriveAction.RESTORE -> restoreFromDriveNow()
             }
@@ -161,14 +160,31 @@ class BackupViewModel(
         }
     }
 
+    /**
+     * Restaura (fusiona) el respaldo encontrado en Drive, activa el respaldo automático y sube
+     * lo que este teléfono tenga de más. Nada se pisa: la fusión solo agrega.
+     */
     fun confirmRestoreRemoteBackup() {
         _events.update { it.copy(foundRemoteBackup = null) }
-        restoreFromDriveNow()
+        handle[KEY_PENDING_DRIVE_ACTION] = PendingDriveAction.RESTORE.name
+        runOperation(OperationKind.DRIVE_RESTORE) { updateProgress ->
+            val counts = driveBackupManager.restoreFromDrive(updateProgress)
+            handle[KEY_PENDING_DRIVE_ACTION] = null
+            driveBackupManager.enableDriveBackup()
+            _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP)
+            driveBackupManager.backupNow { progress ->
+                _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP, progress)
+            }
+            emitRestoreMessage(counts)
+        }
     }
 
+    /**
+     * "Ahora no": no se toca Drive. Respaldar ahora achicaría el respaldo remoto, así que el
+     * respaldo automático no se activa hasta que el usuario lo restaure.
+     */
     fun dismissRemoteBackupPrompt() {
-        _events.update { it.copy(foundRemoteBackup = null) }
-        backupToDriveNow()
+        _events.update { it.copy(foundRemoteBackup = null, message = UiMessage.Res(R.string.backup_remote_skipped)) }
     }
 
     fun cancelOperation() {
@@ -180,46 +196,30 @@ class BackupViewModel(
 
     private fun startConnectDrive() {
         handle[KEY_PENDING_DRIVE_ACTION] = PendingDriveAction.CONNECT.name
-        runOperation(OperationKind.DRIVE_CHECKING) {
-            driveBackupManager.enableDriveBackup()
-            val localLinks = repository.observeCount().first()
-            val remoteBackup = if (localLinks == 0) {
-                driveBackupManager.checkRemoteBackup()
-            } else {
-                null
-            }
-            handle[KEY_PENDING_DRIVE_ACTION] = null
-            if (remoteBackup != null && remoteBackup.linkCount > 0) {
-                _events.update { it.copy(foundRemoteBackup = remoteBackup) }
-            } else {
-                _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP)
-                driveBackupManager.backupNow { progress ->
-                    _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP, progress)
-                }
-                _events.update { it.copy(message = UiMessage.Res(R.string.backup_success_drive)) }
-            }
-        }
+        runOperation(OperationKind.DRIVE_CHECKING) { connectDrive() }
     }
 
-    private fun completeConnectDrive(token: String) {
-        runOperation(OperationKind.DRIVE_CHECKING) {
-            driveBackupManager.enableDriveBackup(token)
-            val localLinks = repository.observeCount().first()
-            val remoteBackup = if (localLinks == 0) {
-                driveBackupManager.checkRemoteBackup()
-            } else {
-                null
-            }
-            if (remoteBackup != null && remoteBackup.linkCount > 0) {
-                _events.update { it.copy(foundRemoteBackup = remoteBackup) }
-            } else {
-                _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP)
-                driveBackupManager.backupNow { progress ->
-                    _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP, progress)
-                }
-                _events.update { it.copy(message = UiMessage.Res(R.string.backup_success_drive)) }
-            }
+    private fun completeConnectDrive() {
+        runOperation(OperationKind.DRIVE_CHECKING) { connectDrive() }
+    }
+
+    /**
+     * Antes de activar nada se mira Drive: si tiene un respaldo que este teléfono no fusionó, se
+     * ofrece restaurarlo y el respaldo automático queda apagado hasta entonces.
+     */
+    private suspend fun connectDrive() {
+        val state = driveBackupManager.checkRemoteState()
+        handle[KEY_PENDING_DRIVE_ACTION] = null
+        if (state is DriveBackupManager.RemoteState.NeedsMerge) {
+            _events.update { it.copy(foundRemoteBackup = state.info) }
+            return
         }
+        driveBackupManager.enableDriveBackup()
+        _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP)
+        driveBackupManager.backupNow { progress ->
+            _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP, progress)
+        }
+        _events.update { it.copy(message = UiMessage.Res(R.string.backup_success_drive)) }
     }
 
     private fun emitRestoreMessage(counts: MergeCounts) {
@@ -244,6 +244,9 @@ class BackupViewModel(
                 }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: BackupException.RemoteNotMerged) {
+                // Drive tiene contenido que este teléfono no tiene: se ofrece restaurarlo.
+                _events.update { it.copy(foundRemoteBackup = e.info) }
             } catch (e: BackupException.AuthRequired) {
                 if (e.resolution != null) {
                     _events.update { it.copy(authResolution = e.resolution) }
@@ -268,7 +271,6 @@ class BackupViewModel(
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as PaperLinkApp
                 BackupViewModel(
                     handle = createSavedStateHandle(),
-                    repository = app.container.linkRepository,
                     preferences = app.container.userPreferencesRepository,
                     zipBackupManager = app.container.zipBackupManager,
                     driveAuthManager = app.container.driveAuthManager,

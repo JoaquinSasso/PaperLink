@@ -226,4 +226,9 @@
     <string name="error_backup_auth_required">Google Drive authorization is required to continue.</string>
     <string name="error_backup_not_found">No backup was found in this Google Drive account.</string>
     <string name="error_backup_network">Could not connect to Google Drive. Check your connection and try again.</string>
+
+    <!-- Respaldo: protección del respaldo de Drive -->
+    <string name="error_backup_remote_not_merged">Google Drive has a backup that is not on this phone yet. Restore it first so nothing gets lost.</string>
+    <string name="backup_remote_skipped">Nothing was backed up, so the backup in Google Drive stays as it is. Automatic backup turns on after you restore it.</string>
+    <string name="home_backup_remote_pending_warning">Google Drive has a backup that is not on this phone. Automatic backup is paused until you restore it. Tap to open.</string>
 </resources>

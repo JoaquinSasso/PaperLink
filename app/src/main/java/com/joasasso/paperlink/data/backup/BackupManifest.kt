@@ -181,6 +181,13 @@ sealed class BackupException(message: String, cause: Throwable? = null) : IOExce
     /** No hay respaldo guardado en la cuenta de Google Drive. */
     class NoRemoteBackup(message: String = "No backup found in Google Drive") : BackupException(message)
 
+    /**
+     * Drive tiene un respaldo que este teléfono todavía no fusionó: respaldar ahora lo achicaría.
+     * Hay que restaurarlo (fusionar) primero.
+     */
+    class RemoteNotMerged(val info: RemoteBackupInfo) :
+        BackupException("Google Drive has a backup that is not merged on this device")
+
     /** Fallo de red o respuesta inesperada del servidor de Drive. */
     class NetworkError(message: String, cause: Throwable? = null) : BackupException(message, cause)
 }

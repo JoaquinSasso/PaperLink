@@ -16,6 +16,7 @@ fun Throwable.messageRes(): Int = when (this) {
     is BackupException.CorruptBackup -> R.string.error_backup_corrupt
     is BackupException.AuthRequired -> R.string.error_backup_auth_required
     is BackupException.NoRemoteBackup -> R.string.error_backup_not_found
+    is BackupException.RemoteNotMerged -> R.string.error_backup_remote_not_merged
     is BackupException.NetworkError -> R.string.error_backup_network
     else -> R.string.error_generic
 }

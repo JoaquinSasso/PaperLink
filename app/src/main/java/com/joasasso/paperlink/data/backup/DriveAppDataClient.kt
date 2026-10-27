@@ -13,11 +13,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okio.BufferedSink
 import java.io.IOException
 import java.io.InputStream
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /** Archivo almacenado en `appDataFolder` de Google Drive. */
@@ -35,11 +35,12 @@ interface DriveRemoteStore {
     /** Lista todos los archivos en `appDataFolder`, ordenados del más reciente al más antiguo. */
     suspend fun listFiles(accessToken: String): List<RemoteDriveFile>
 
-    /** Sube un archivo nuevo a `appDataFolder` leyendo su contenido de [contentStream]. */
+    /** Sube un archivo nuevo a `appDataFolder` leyendo [contentLength] bytes de [contentStream]. */
     suspend fun uploadStream(
         accessToken: String,
         name: String,
         mimeType: String,
+        contentLength: Long,
         contentStream: InputStream,
     ): RemoteDriveFile
 
@@ -109,47 +110,55 @@ class DriveAppDataClient(
         allFiles
     }
 
+    /**
+     * Subida reanudable (`uploadType=resumable`): sirve para archivos de cualquier tamaño (la
+     * multipart está pensada para hasta 5 MB). Primero se abre la sesión con los metadatos y
+     * después se envía el contenido en un solo PUT. Si se corta, el próximo respaldo lo reintenta.
+     */
     override suspend fun uploadStream(
         accessToken: String,
         name: String,
         mimeType: String,
+        contentLength: Long,
         contentStream: InputStream,
     ): RemoteDriveFile = withContext(ioDispatcher) {
-        val boundary = "paperlink_${UUID.randomUUID()}"
         val metadataJson = json.encodeToString(CreateFileMetadata(name = name))
-        val multipartBody = object : RequestBody() {
-            override fun contentType() = "multipart/related; boundary=$boundary".toMediaType()
+        val startUrl = UPLOAD_ENDPOINT.toHttpUrl().newBuilder()
+            .addQueryParameter("uploadType", "resumable")
+            .addQueryParameter("fields", "id,name,size")
+            .build()
+        val start = Request.Builder()
+            .url(startUrl)
+            .header("Authorization", "Bearer $accessToken")
+            .header("X-Upload-Content-Type", mimeType)
+            .header("X-Upload-Content-Length", contentLength.toString())
+            .post(metadataJson.toRequestBody("application/json; charset=UTF-8".toMediaType()))
+            .build()
+        val sessionUrl = executeRequest(start) { response ->
+            response.header("Location") ?: throw BackupException.NetworkError("Drive did not return an upload session")
+        }
+
+        val content = object : RequestBody() {
+            override fun contentType() = mimeType.toMediaType()
+            override fun contentLength() = contentLength
             override fun isOneShot(): Boolean = true
 
             override fun writeTo(sink: BufferedSink) {
-                sink.writeUtf8("--$boundary\r\n")
-                sink.writeUtf8("Content-Type: application/json; charset=UTF-8\r\n\r\n")
-                sink.writeUtf8(metadataJson)
-                sink.writeUtf8("\r\n--$boundary\r\n")
-                sink.writeUtf8("Content-Type: $mimeType\r\n\r\n")
-
                 val buffer = ByteArray(BUFFER_SIZE)
                 while (true) {
                     val read = contentStream.read(buffer)
                     if (read < 0) break
                     sink.write(buffer, 0, read)
                 }
-                sink.writeUtf8("\r\n--$boundary--\r\n")
             }
         }
-
-        val url = UPLOAD_ENDPOINT.toHttpUrl().newBuilder()
-            .addQueryParameter("uploadType", "multipart")
-            .addQueryParameter("fields", "id,name,size")
-            .build()
-
-        val request = Request.Builder()
-            .url(url)
+        val upload = Request.Builder()
+            .url(sessionUrl)
             .header("Authorization", "Bearer $accessToken")
-            .post(multipartBody)
+            .put(content)
             .build()
 
-        executeRequest(request) { response ->
+        executeRequest(upload) { response ->
             val body = response.body?.string()
                 ?: throw BackupException.NetworkError("Empty response uploading $name")
             json.decodeFromString<RemoteDriveFile>(body)

@@ -37,6 +37,10 @@ class DriveBackupWorker(
         } catch (e: BackupException.AuthRequired) {
             log("Periodic Drive backup requires re-authorization", e)
             Result.failure()
+        } catch (e: BackupException.RemoteNotMerged) {
+            // Drive tiene un respaldo sin fusionar: no se respalda (no se pisa). La Home lo avisa.
+            log("Periodic Drive backup skipped: remote backup not merged", e)
+            Result.failure()
         } catch (e: BackupException.NetworkError) {
             log("Periodic Drive backup network error (attempt $runAttemptCount)", e)
             if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()

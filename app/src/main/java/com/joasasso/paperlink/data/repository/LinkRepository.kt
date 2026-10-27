@@ -218,14 +218,18 @@ class LinkRepository(
     // --- Respaldo ---
 
     /**
-     * Arma el snapshot de todos los códigos y attachments vigentes cuyos archivos están en disco.
+     * Arma el snapshot de todos los códigos y attachments vigentes.
+     *
+     * @param includeMissingFiles incluir también los attachments cuyo archivo falta en disco (el
+     *   respaldo de Drive los conserva si su copia remota existe). El ZIP no los incluye porque no
+     *   tiene de dónde sacar el archivo.
      */
-    suspend fun exportSnapshot(): BackupManifest {
+    suspend fun exportSnapshot(includeMissingFiles: Boolean = false): BackupManifest {
         val activeLinks = dao.getAllActiveLinks().map { it.visible() }
         val links = mutableListOf<BackupLink>()
         val attachments = mutableListOf<BackupAttachment>()
         for (item in activeLinks) {
-            val validAttachments = item.attachments.filter { att ->
+            val validAttachments = if (includeMissingFiles) item.attachments else item.attachments.filter { att ->
                 val available = isAvailable(att)
                 if (!available) log("Skipping missing file in backup: ${att.relativePath}")
                 available

@@ -147,6 +147,9 @@ class AttachmentStore(
         sha256Of(file).equals(expectedSha256, ignoreCase = true)
     }
 
+    /** Tamaño en bytes de un archivo de `media/`. */
+    suspend fun length(relativePath: String): Long = withContext(ioDispatcher) { fileFor(relativePath).length() }
+
     /** Lee los bytes de un archivo de `media/` en [ioDispatcher]. */
     suspend fun readFile(relativePath: String, reader: suspend (InputStream) -> Unit) = withContext(ioDispatcher) {
         FileInputStream(fileFor(relativePath)).buffered(BUFFER_SIZE).use { input ->
