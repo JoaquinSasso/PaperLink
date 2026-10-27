@@ -17,7 +17,10 @@ import com.joasasso.paperlink.ui.screens.home.HomeViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -35,6 +38,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -322,6 +326,127 @@ class BackupTest {
         assertEquals(HomeViewModel.BackupBanner.NeedsReauth, reauthBanner)
     }
 
+    private fun drive(node: TestNode, remote: FakeDriveRemoteStore, scheduler: FakeBackupScheduler = FakeBackupScheduler()) =
+        DriveBackupManager(
+            store = node.store,
+            repository = node.repository,
+            preferences = node.preferences,
+            tokenProvider = FakeTokenProvider(),
+            remote = remote,
+            scheduler = scheduler,
+        )
+
+    private suspend fun TestNode.createFileLink(name: String): String =
+        repository.createLink(listOf(AttachmentSource.Content(dir.source(name, "$name-bytes".encodeToByteArray()))))
+
+    @Test
+    fun newPhone_refusesToBackupOverUnmergedRemote_andLeavesDriveIntact() = runBlocking {
+        val remote = FakeDriveRemoteStore()
+        sourceNode.createFileLink("a.bin")
+        sourceNode.createFileLink("b.bin")
+        drive(sourceNode, remote).backupNow()
+        val before = remote.names().sorted()
+
+        // Teléfono nuevo (vacío): conectar ve un respaldo sin fusionar y respaldar se niega.
+        val targetDrive = drive(targetNode, remote)
+        val state = targetDrive.checkRemoteState()
+        assertTrue(state is DriveBackupManager.RemoteState.NeedsMerge)
+        assertEquals(2, (state as DriveBackupManager.RemoteState.NeedsMerge).info.linkCount)
+        try {
+            targetDrive.backupNow()
+            fail("Expected RemoteNotMerged")
+        } catch (e: BackupException.RemoteNotMerged) {
+            assertEquals(2, e.info.linkCount)
+        }
+
+        assertEquals("Drive no debe cambiar", before, remote.names().sorted())
+        assertTrue(targetNode.preferences.backupSettings.first().remotePending)
+    }
+
+    @Test
+    fun restoreThenBackup_keepsRemoteAndLocalCodes() = runBlocking {
+        val remote = FakeDriveRemoteStore()
+        val fromSource = sourceNode.createFileLink("a.bin")
+        drive(sourceNode, remote).backupNow()
+
+        // El teléfono nuevo ya tenía un código propio: restaura (fusiona) y después respalda.
+        val ownCode = targetNode.createFileLink("own.bin")
+        val targetDrive = drive(targetNode, remote)
+        targetDrive.restoreFromDrive()
+        assertEquals(DriveBackupManager.RemoteState.InSync, targetDrive.checkRemoteState())
+        targetDrive.backupNow()
+        assertTrue(!targetNode.preferences.backupSettings.first().remotePending)
+
+        // Un tercer teléfono que restaura ve los dos códigos con sus archivos.
+        val third = TestNode(context)
+        try {
+            drive(third, remote).restoreFromDrive()
+            assertEquals(setOf(fromSource, ownCode), third.repository.allCodes().toSet())
+            assertEquals(2, third.dir.mediaFiles().size)
+        } finally {
+            third.close()
+        }
+    }
+
+    @Test
+    fun fileMissingOnPhone_isNotDeletedFromDrive() = runBlocking {
+        val remote = FakeDriveRemoteStore()
+        val code = sourceNode.createFileLink("photo.bin")
+        val sourceDrive = drive(sourceNode, remote)
+        sourceDrive.backupNow()
+        val path = sourceNode.repository.getLink(code)!!.attachments.single().relativePath!!
+
+        // El archivo se pierde en el teléfono (la fila sigue): respaldar no lo borra de Drive.
+        File(sourceNode.dir.base, path).delete()
+        sourceDrive.backupNow()
+        assertTrue(path in remote.names())
+
+        drive(targetNode, remote).restoreFromDrive()
+        val restored = targetNode.repository.getLink(code)!!.attachments.single()
+        assertTrue(File(targetNode.dir.base, restored.relativePath!!).isFile)
+    }
+
+    @Test
+    fun ownBackup_isInSync_andEmptyDriveIsNone() = runBlocking {
+        val remote = FakeDriveRemoteStore()
+        val sourceDrive = drive(sourceNode, remote)
+        assertEquals(DriveBackupManager.RemoteState.None, sourceDrive.checkRemoteState())
+
+        sourceNode.createFileLink("a.bin")
+        sourceDrive.backupNow()
+        assertEquals(DriveBackupManager.RemoteState.InSync, sourceDrive.checkRemoteState())
+    }
+
+    @Test
+    fun concurrentBackups_runOneAtATime() = runBlocking {
+        val remote = FakeDriveRemoteStore().apply { uploadDelayMs = 50 }
+        repeat(3) { sourceNode.createFileLink("f$it.bin") }
+        val sourceDrive = drive(sourceNode, remote)
+
+        listOf(
+            async(Dispatchers.IO) { sourceDrive.backupNow() },
+            async(Dispatchers.IO) { sourceDrive.backupNow() },
+        ).awaitAll()
+
+        assertEquals(1, remote.maxConcurrentUploads.get())
+        // Quedó un solo manifest y los 3 archivos.
+        assertEquals(1, remote.names().count { it == BackupManifest.MANIFEST_FILE_NAME })
+        assertEquals(3, remote.names().count { it.startsWith("media/") })
+    }
+
+    @Test
+    fun successAfterDisabling_doesNotReenableAutoBackup() = runBlocking {
+        val prefs = sourceNode.preferences
+        prefs.setDriveBackupEnabled(true, now = 1_000L)
+        prefs.setDriveBackupEnabled(false)
+        prefs.recordDriveBackupSuccess(2_000L, 10L, "manifest-id")
+
+        val settings = prefs.backupSettings.first()
+        assertTrue(!settings.driveEnabled)
+        assertEquals("manifest-id", settings.syncedManifestId)
+        assertEquals(1_000L, settings.driveEnabledAt)
+    }
+
     private class FakeTokenProvider(var shouldFailAuth: Boolean = false) : DriveTokenProvider {
         override suspend fun getAccessToken(): String {
             if (shouldFailAuth) throw BackupException.AuthRequired()
@@ -356,25 +481,41 @@ class BackupTest {
         private var counter = 0
         val uploadOrder = mutableListOf<String>()
         var failOnUploadName: String? = null
+        var uploadDelayMs = 0L
+        private val activeUploads = AtomicInteger(0)
+        val maxConcurrentUploads = AtomicInteger(0)
+
+        fun names(): List<String> = synchronized(entries) { entries.values.map { it.file.name } }
 
         override suspend fun listFiles(accessToken: String): List<RemoteDriveFile> =
-            entries.values.sortedByDescending { it.order }.map { it.file }
+            synchronized(entries) { entries.values.sortedByDescending { it.order }.map { it.file } }
 
         override suspend fun uploadStream(
             accessToken: String,
             name: String,
             mimeType: String,
+            contentLength: Long,
             contentStream: InputStream,
         ): RemoteDriveFile {
             if (failOnUploadName == name) {
                 throw BackupException.NetworkError("Simulated network failure on $name")
             }
-            val bytes = contentStream.readBytes()
-            val id = "drive-${++counter}"
-            val remoteFile = RemoteDriveFile(id = id, name = name, size = bytes.size.toLong())
-            entries[id] = StoredEntry(remoteFile, bytes, counter)
-            uploadOrder += name
-            return remoteFile
+            val active = activeUploads.incrementAndGet()
+            maxConcurrentUploads.updateAndGet { maxOf(it, active) }
+            try {
+                if (uploadDelayMs > 0) delay(uploadDelayMs)
+                val bytes = contentStream.readBytes()
+                assertEquals("Content-Length declarado", contentLength, bytes.size.toLong())
+                synchronized(entries) {
+                    val id = "drive-${++counter}"
+                    val remoteFile = RemoteDriveFile(id = id, name = name, size = bytes.size.toLong())
+                    entries[id] = StoredEntry(remoteFile, bytes, counter)
+                    uploadOrder += name
+                    return remoteFile
+                }
+            } finally {
+                activeUploads.decrementAndGet()
+            }
         }
 
         override suspend fun downloadFile(
@@ -387,7 +528,7 @@ class BackupTest {
         }
 
         override suspend fun deleteFile(accessToken: String, fileId: String) {
-            entries.remove(fileId)
+            synchronized(entries) { entries.remove(fileId) }
         }
     }
 }

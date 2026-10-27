@@ -125,4 +125,16 @@ class BackupManifestAndSettingsTest {
         assertFalse(fresh.copy(suggestionDismissed = true).shouldSuggestBackup(5))
         assertFalse(fresh.copy(driveEnabled = true).shouldSuggestBackup(5))
     }
+
+    @Test
+    fun backupSettings_staleWhenEnabledLongAgoAndNeverSucceeded() {
+        val day = 24L * 60 * 60 * 1000
+        val neverSucceeded = BackupSettings(driveEnabled = true, driveEnabledAt = 0L, lastBackupAt = null)
+        assertFalse(neverSucceeded.isStale(now = 6 * day))
+        assertTrue(neverSucceeded.isStale(now = 8 * day))
+        // Sin fecha de activación (versión anterior) y sin respaldos: no hay referencia, no avisa.
+        assertFalse(BackupSettings(driveEnabled = true).isStale(now = 100 * day))
+        // Apagado nunca avisa.
+        assertFalse(BackupSettings(driveEnabled = false, driveEnabledAt = 0L).isStale(now = 100 * day))
+    }
 }
