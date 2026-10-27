@@ -140,6 +140,7 @@ class BackupViewModel(
 
     fun onAuthResult(resultOk: Boolean, data: Intent?) {
         val pendingName = handle.get<String>(KEY_PENDING_DRIVE_ACTION)
+        log("Drive auth result received: resultOk=$resultOk, pending=$pendingName")
         handle[KEY_PENDING_DRIVE_ACTION] = null
         if (!resultOk) return
 

@@ -42,7 +42,12 @@ class DriveAuthManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : DriveTokenProvider {
 
+    @Volatile
+    private var cachedToken: String? = null
+
     override suspend fun getAccessToken(): String {
+        cachedToken?.let { return it }
+
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(DRIVE_APPDATA_SCOPE)))
             .build()
@@ -55,11 +60,13 @@ class DriveAuthManager(
             log("Drive authorization error", e)
             throw BackupException.NetworkError("Could not authorize with Google Drive", e)
         }
-        return extractToken(result)
+        val token = extractToken(result)
+        cachedToken = token
+        return token
     }
 
     /**
-     * Procesa el `Intent` devuelto por la pantalla de consentimiento de Google.
+     * Procesa el `Intent` devuelto por la pantalla de consentimiento de Google y guarda el token.
      */
     fun getTokenFromIntent(data: Intent?): String {
         if (data == null) throw BackupException.AuthRequired(message = "Authorization cancelled")
@@ -69,10 +76,16 @@ class DriveAuthManager(
             log("Drive consent result failed with status ${e.statusCode}", e)
             throw BackupException.AuthRequired(cause = e)
         }
-        return extractToken(result)
+        val token = extractToken(result)
+        cachedToken = token
+        log("Drive authorization token acquired from consent result")
+        return token
     }
 
     override suspend fun invalidateToken(token: String) = withContext(ioDispatcher) {
+        if (cachedToken == token) {
+            cachedToken = null
+        }
         try {
             GoogleAuthUtil.clearToken(context, token)
         } catch (e: Exception) {
@@ -82,6 +95,7 @@ class DriveAuthManager(
 
     private fun extractToken(result: AuthorizationResult): String {
         if (result.hasResolution()) {
+            log("Drive authorization requires user resolution")
             throw BackupException.AuthRequired(
                 resolution = result.pendingIntent,
                 message = "User consent required for Google Drive",
