@@ -36,3 +36,4 @@ No hace falta para cambios directos sin investigación (una corrección obvia, u
 | Fecha | Informe | Tema |
 | --- | --- | --- |
 | 27/10/2026 | [Fotos: espacio en el respaldo y velocidad de carga](2026-10-27-fotos-espacio-y-velocidad.md) | WebP 2400 q70 (−79 %), carga en segundo plano con el código al instante, 4 bugs de concurrencia y cancelación |
+| 27/10/2026 | [Respaldo en Google Drive: velocidad, segundo plano y sincronización por Wi-Fi](2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md) | `multipart` ≤ 5 MB + 8 subidas en paralelo sobre HTTP/2 (19,5× más rápido), ejecución en segundo plano y sincronización automática al agregar contenido y al abrir la app con Wi-Fi |
