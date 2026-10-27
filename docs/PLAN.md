@@ -11,6 +11,7 @@ Actualizado: 26/10/2026.
   1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual (en una instalación limpia): Drive no debe cambiar y la app debe avisar que el respaldo automático quedó en pausa.
 - **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
 - **Siguiente después:** Fase 5 (pulido y publicación).
+- **Carga de varias fotos más rápida (27/10/2026):** 3 fotos a la vez y código visible tras la primera (ver "Carga de fotos" más abajo). Falta que el usuario lo pruebe en el teléfono con unas 25 fotos de la galería (los logs de debug `Batch: code ready after …` y `Batch: … finished after …` dan los tiempos). Compartir desde otra app sigue igual (paso siguiente).
 - **Fotos en WebP (27/10/2026):** las fotos nuevas se guardan en WebP 2400 px q70 (≈ −79 %). Falta que el usuario saque una foto con la cámara de la app y la vea en el visor (los tests instrumentados ya lo cubren en el Pixel; la prueba manual no se pudo hacer porque el teléfono estaba bloqueado). Las fotos viejas quedan en JPEG. Posible siguiente paso: comprimir videos (decisión pendiente: dependencia Media3 Transformer y opción para el usuario).
 - **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4 y cubiertas por tests; la restauración completa se probó en el teléfono.
 - **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (el usuario no tenía archivos así), dispositivo de gama baja y build de release con R8 → Fase 5.
@@ -272,6 +273,20 @@ Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial imp
 - WebP codifica en ~0,4 s por foto (JPEG ~0,04 s); no se nota porque las fotos se guardan de a una.
 - Antes de Android 11 se usa `CompressFormat.WEBP`, que con calidad < 100 también es con pérdida. Las transparencias se siguen componiendo sobre blanco.
 
+### Carga de fotos (27/10/2026)
+
+Pedido del usuario: cargar 25 fotos de la galería se sentía muy lento. Medición en el Pixel 8 con fotos del tamaño de las de la cámara (4080×3072, EXIF 90): ~1 s por foto, de los cuales ~0,7 s son la codificación WebP (Android no permite elegir un modo más rápido). En paralelo: de a 2, 0,55 s por foto; de a 3, 0,42 s; de a 4, 0,37 s.
+
+- **Optimización:** `BatchImporter` importa 3 a la vez (1 en teléfonos con poca RAM). En Android 9+ se decodifica con `ImageDecoder` directo al tamaño final (aplica la orientación EXIF y no carga la imagen completa en memoria, lo que permite el paralelismo). La copia temporal del original ya no hace `fsync` cuando se va a re-codificar.
+- **Carga progresiva:** al crear un código, apenas el primer elemento queda guardado se crea el código y se abre su pantalla (garantía 8 intacta); el resto se agrega en segundo plano en el orden elegido, con una tarjeta de progreso (pantalla del código, detalle y Home) y opción de cancelar (lo guardado queda). Si alguno falla se avisa cuántos. Al agregar a un código existente todo va en segundo plano.
+- **Si la app se cierra a mitad:** la carga queda anotada en preferencias (`pendingImports`); al volver, la Home avisa "se guardaron X de N" para que el usuario agregue los que faltan. No se retoma sola (requeriría permisos persistentes y no funciona con compartir).
+- **Compartir desde otra app:** sin cambios por ahora (copia y re-codifica todo antes de elegir destino). Siguiente paso: copiar crudo (~40 ms por foto) y re-codificar después de elegir.
+- **Bugs encontrados por los tests nuevos y corregidos:**
+  - Con varias importaciones a la vez y `media/` todavía inexistente (instalación nueva), `mkdirs()` devolvía `false` en la que perdía la carrera y esa foto fallaba. Ahora solo falla si la carpeta sigue sin existir.
+  - Una operación de Room puede confirmarse y aun así lanzar la cancelación al volver; borrar el archivo en ese caso dejaba una fila sin archivo (garantía 1). Ahora los archivos importados solo se borran si ninguna fila los referencia (`LinkRepository.discardUnreferenced`), lo que también protege los caminos existentes (cámara, compartir, restaurar).
+  - Si la cancelación llegaba antes del `try` del trabajo en segundo plano, la carga quedaba "en curso" para siempre. El orden al terminar (borrar la anotación antes que el estado) evita que la Home muestre un falso "carga cortada".
+  - Si la cancelación llega justo cuando un archivo ya se escribió pero antes de devolverlo, queda un archivo sin fila: lo borra el barrido de huérfanos del próximo inicio.
+
 ## 10. Registro de decisiones
 
 | Fecha | Decisión | Motivo |
@@ -296,3 +311,5 @@ Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial imp
 | 2026-10-26 | Respaldo en Drive con `drive.appdata` | Carpeta oculta, scope no sensible; sin necesidad de ver los archivos desde la PC |
 | 2026-10-26 | Un respaldo nunca achica Drive sin fusionar antes; sin Auto Backup de Android en la nube | Evita perder el respaldo al cambiar de teléfono o al tocar "Ahora no" |
 | 2026-10-27 | Fotos nuevas en WebP 2400 px calidad 70 (antes JPEG 3000 px q85) | −79 % de espacio en el teléfono y en Drive con la letra igual de legible; ZIP no ahorra y HEIC pesa más en Android |
+| 2026-10-27 | Carga de varias fotos: 3 a la vez y código visible tras la primera, resto en segundo plano | Cargar 25 fotos tardaba ~25 s; ahora el código aparece en ~1 s y el total baja 2–3 veces |
+| 2026-10-27 | Si la app se cierra a mitad de una carga, avisar (no retomar sola) | Retomar pediría permisos persistentes y una cola; la ventana es de pocos segundos |
