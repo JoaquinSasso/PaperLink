@@ -12,7 +12,7 @@
 
 Las fotos son el contenido principal de PaperLink y tenían dos problemas que se notaban con el uso real:
 
-1. **Ocupaban mucho.** Unos 590 KB por foto de cuaderno: 400 fotos serían ~230 MB en el teléfono y otro tanto en el Drive del usuario.
+1. **Ocupaban mucho.** Unos 590 KB por foto de cuaderno: 400 fotos serían ~230 MB en el teléfono y otro tanto en Google Drive.
 2. **Cargar varias desde la galería era lento.** 25 fotos tardaban entre 15 y 25 segundos, y el código no aparecía hasta el final.
 
 Después de medir antes de decidir, quedaron así:
@@ -30,26 +30,26 @@ En el camino, los tests nuevos encontraron **cuatro bugs reales**, uno de ellos 
 
 | Hora (27/10) | Hecho |
 | --- | --- |
-| ~00:00 | El usuario reporta que con 17 fotos el respaldo en Drive ya ocupa 7 MB y propone comprimir (por ejemplo, en un ZIP). |
-| ~00:05 | Medición: comprimir en ZIP ahorraría 0,25 %. Se descarta. |
-| ~00:10 | Prueba de formatos con fotos reales del usuario: JPEG, WebP y HEIC con distintas calidades y tamaños. |
-| ~00:30 | Decisión: WebP, lado mayor 2400 px, calidad 70. Implementado y probado (`0e4e45f`). |
-| ~00:40 | El usuario reporta que cargar 25 fotos desde la galería se siente muy lento. |
-| ~00:45 | Benchmark por etapas y de paralelismo en el teléfono. |
-| ~00:50–01:05 | Implementación de la carga en segundo plano (3 a la vez, código tras la primera foto). Los tests nuevos encuentran 4 bugs; se corrigen (`7f58d6f`, `642dcc0`, `d61302e`). |
-| ~01:08 | Prueba del usuario: código a los 0,64 s, 25 fotos en 4,7 s. Nota que "las primeras 3 tardan mucho más". |
-| ~01:10 | Análisis: no son más lentas, es el llenado de la cola en paralelo. El usuario elige crear el código vacío al instante. |
-| ~01:22 | Prueba del usuario: código a los 9 ms, 25 fotos en 4,2 s, sin errores (`0ec86b0`, `750af1e`). |
+| ~00:00 | Detectamos que con 17 fotos el respaldo en Drive ya ocupaba 7 MB y planteamos la hipótesis inicial de comprimirlo (por ejemplo, en un ZIP). |
+| ~00:05 | Medición: comprimir en ZIP ahorraría apenas 0,25 %. Lo descartamos. |
+| ~00:10 | Prueba de formatos con nuestras fotos reales de estudio: JPEG, WebP y HEIC con distintas calidades y tamaños. |
+| ~00:30 | Decisión del equipo: WebP, lado mayor 2400 px, calidad 70. Implementado y probado (`0e4e45f`). |
+| ~00:40 | Al probar la carga de 25 fotos desde la galería, notamos que se sentía muy lenta. |
+| ~00:45 | Benchmark por etapas y de paralelismo en el Pixel 8. |
+| ~00:50–01:05 | Implementamos la carga en segundo plano (3 a la vez, código tras la primera foto). Los tests nuevos encuentran 4 bugs; los corregimos (`7f58d6f`, `642dcc0`, `d61302e`). |
+| ~01:08 | Prueba en el dispositivo: código a los 0,64 s, 25 fotos en 4,7 s. Observamos que "las primeras 3 tardan mucho más". |
+| ~01:10 | Análisis: no son más lentas, es el llenado de la cola en paralelo. Decidimos crear el código vacío al instante. |
+| ~01:22 | Prueba final en el dispositivo: código a los 9 ms, 25 fotos en 4,2 s, sin errores (`0ec86b0`, `750af1e`). |
 
 ## Parte 1: espacio
 
 ### El problema
 
-Con 17 fotos el respaldo ya ocupaba 7 MB. Extrapolando a un uso de varios meses (400 fotos), el respaldo ocuparía cientos de MB de los 15 GB gratuitos del usuario, y lo mismo en el teléfono. Con videos, mucho más.
+Con 17 fotos el respaldo ya ocupaba 7 MB. Extrapolando a un uso de varios meses (400 fotos), el respaldo ocuparía cientos de MB de los 15 GB gratuitos de Google Drive, y lo mismo en el teléfono. Con videos, mucho más.
 
 ### Hipótesis 1: comprimir el respaldo (ZIP)
 
-La propuesta inicial fue comprimir los archivos en un ZIP antes de subirlos. Se midió directamente en el teléfono, con gzip al máximo sobre las fotos guardadas:
+Nuestra primera idea fue comprimir los archivos en un ZIP antes de subirlos. Lo medimos directamente en el teléfono, con gzip al máximo sobre las fotos guardadas:
 
 | | Bytes |
 | --- | --- |
@@ -59,11 +59,11 @@ La propuesta inicial fue comprimir los archivos en un ZIP antes de subirlos. Se 
 
 JPEG (y los videos) ya están comprimidos: un compresor genérico no tiene qué sacar. Además, meter todo en un ZIP rompería el respaldo incremental (hoy cada foto se sube una sola vez). **Descartada.**
 
-La conclusión importante: el ahorro tenía que venir de **guardar las fotos más chicas al importarlas**, lo que achica a la vez el teléfono y el respaldo.
+La conclusión importante: el ahorro tenía que venir de **guardar las fotos más chicas al importarlas**, lo que achica a la vez el espacio en el teléfono y el respaldo.
 
 ### Hipótesis 2: otro formato o tamaño
 
-Se armó un experimento temporal (test instrumentado, no commiteado) que codificaba las mismas fotos con los **codificadores del propio teléfono** en varias variantes, medía el tamaño y generaba recortes ampliados de zonas con letra para comparar la legibilidad. El usuario cargó 25 fotos reales: hojas de cuaderno en lápiz y birome, un parcial impreso, pizarrones y una pantalla proyectada.
+Armamos un experimento temporal (test instrumentado, no commiteado) que codificaba las mismas fotos con los **codificadores del propio teléfono** en varias variantes, medía el tamaño y generaba recortes ampliados de zonas con letra para comparar la legibilidad. Probamos con un lote real de 25 fotos: hojas de cuaderno en lápiz y birome, un parcial impreso, pizarrones y una pantalla proyectada.
 
 | Variante | Promedio | Frente a lo de antes | 400 fotos | Codificación |
 | --- | --- | --- | --- | --- |
@@ -85,10 +85,10 @@ Se armó un experimento temporal (test instrumentado, no commiteado) que codific
 
 ### Decisión e implementación
 
-- **WebP con pérdida, lado mayor 2400 px, calidad 70** (elegida por el usuario, buscando el máximo ahorro).
+- **WebP con pérdida, lado mayor 2400 px, calidad 70** (elegida buscando el máximo ahorro sin perder legibilidad en trazos de lápiz).
 - En Android 11+ se usa `WEBP_LOSSY`; antes, `WEBP`, que con calidad menor a 100 también es con pérdida.
 - Aplica a las fotos nuevas; las ya guardadas quedan en JPEG (recomprimirlas cambiaría sus huellas SHA-256 y obligaría a volver a subirlas).
-- Test nuevo: importar una imagen que ya es WebP no pisa el original con el re-codificado (el mismo tipo de bug que se encontró en la fase 2 con JPEG, cuando el `.part` del original y el del re-codificado tenían el mismo nombre).
+- Test nuevo: importar una imagen que ya es WebP no pisa el original con el re-codificado (el mismo tipo de bug que encontramos en la fase 2 con JPEG, cuando el `.part` del original y el del re-codificado tenían el mismo nombre).
 
 ### Costo aceptado
 
@@ -134,16 +134,16 @@ Las imágenes de prueba tenían ruido a propósito (peor caso para WebP); con fo
 
 ### Resultado de la primera versión
 
-Prueba del usuario con las mismas 25 fotos (logs de debug `Batch: …`):
+Prueba en el dispositivo con las mismas 25 fotos (logs de debug `Batch: …`):
 
 - Código visible a los **0,64 s**.
 - 25 fotos guardadas en **4,7 s** (antes, 15–25 s).
 
-El usuario notó que "las primeras 3 fotos tardaron mucho más que el resto". Las horas de los archivos mostraron que no eran más lentas: las 3 primeras terminaron juntas a los ~0,6 s y después terminó una cada ~0,2 s. Es el llenado de una cola en paralelo: la primera tanda tarda una foto entera; desde ahí, el ritmo es 3 veces más rápido.
+Durante la prueba observamos que "las primeras 3 fotos tardaron mucho más que el resto". Las marcas de tiempo de los archivos mostraron que no eran más lentas: las 3 primeras terminaron juntas a los ~0,6 s y después terminó una cada ~0,2 s. Es el llenado de una cola en paralelo: la primera tanda tarda una foto entera; desde ahí, el ritmo es 3 veces más rápido.
 
 ### Ajuste: código al instante
 
-Se ofrecieron dos opciones: darle prioridad a la primera foto (código en ~0,4 s) o **crear el código vacío antes de importar nada** (código en milisegundos). El usuario eligió la segunda, que modifica la garantía 8: el código se sigue mostrando solo cuando está guardado en la base, pero puede estar un rato sin fotos.
+Evaluamos dos opciones: darle prioridad a la primera foto (código en ~0,4 s) o **crear el código vacío antes de importar nada** (código en milisegundos). Optamos por la segunda, ajustando la garantía 8: el código se sigue mostrando solo cuando está guardado en la base, pero puede estar unos segundos sin fotos mientras se importan en segundo plano.
 
 - Si no se puede guardar ninguna foto, el código queda (ya está anotado en papel) y la tarjeta avisa que se vuelvan a agregar con "Agregar más".
 - Los códigos vacíos se incluyen en el respaldo, para que sigan reservados después de restaurar.
@@ -195,24 +195,24 @@ Si la cancelación llega justo cuando una importación ya escribió su archivo p
   - `AttachmentStoreTest`: WebP y tamaño máximo, WebP de origen sin pisarse, foto grande rotada escalada sin deformarse.
   - `LinkRepositoryTest`: código vacío, choque de códigos vacíos, código vacío incluido en el respaldo.
 - **Estabilidad:** el test de cancelación pasó 20 de 20 veces seguidas, y `BatchImporterTest` completo, 5 de 5.
-- **En el teléfono, por el usuario:** 25 fotos reales de la galería, código a los 9 ms, todo guardado en 4,2 s, sin errores ni crashes en logcat.
+- **En el teléfono (prueba en vivo):** 25 fotos reales de la galería, código a los 9 ms, todo guardado en 4,2 s, sin errores ni crashes en logcat.
 
 ## Qué salió bien
 
-- **Medir antes de decidir.** La idea intuitiva (comprimir en un ZIP) habría ahorrado 0,25 %. La prueba de formatos con fotos reales llevó a −79 %.
+- **Medir antes de decidir.** La idea intuitiva (comprimir en un ZIP) habría ahorrado 0,25 %. La prueba de formatos con fotos reales nos llevó a −79 %.
 - **Usar fotos reales del caso de uso** (cuadernos, pizarrones) y comparar la legibilidad con recortes ampliados, no solo el tamaño.
 - **Tests en el dispositivo real** con archivos reales: encontraron 4 bugs de concurrencia y cancelación que no se ven en una prueba manual.
 - **Repetir los tests intermitentes** hasta reproducir la falla, en lugar de reintentar hasta que pasen.
 
 ## Qué se puede mejorar
 
-- **HEIC se descartó en silencio en la primera ronda:** se probó solo con 2 fotos de calibración y no se incluyó en la prueba con las 25 fotos reales sin decirlo claramente. El usuario lo preguntó y se corrió la prueba completa. Lección: informar todas las variantes probadas, también las descartadas, con sus números.
-- **El benchmark de velocidad usó imágenes sintéticas** (peor caso para WebP). Sirvió para comparar alternativas, pero los tiempos absolutos vinieron de la prueba real del usuario.
+- **El agente descartó HEIC en silencio en la primera ronda:** se probó solo con 2 fotos de calibración y no se incluyó en la prueba con las 25 fotos reales sin avisar. Al revisarlo en equipo se detectó la omisión y se corrió la batería completa. Lección: documentar todas las variantes probadas, también las descartadas, con sus números.
+- **El benchmark de velocidad usó imágenes sintéticas** (peor caso para WebP). Sirvió para comparar alternativas, pero los tiempos absolutos vinieron de nuestra prueba real con las 25 fotos.
 - **El patrón "borrar el archivo si la operación falló"** estaba en el código desde la fase 1 sin contemplar que una cancelación puede llegar después de confirmar. Revisar este patrón en cualquier código nuevo que combine archivos y base.
 
 ## Pendientes
 
 - **Compartir desde otra app:** sigue copiando y re-codificando todo antes de elegir el destino. Siguiente paso: copiar crudo (~40 ms por foto) y re-codificar en segundo plano después de elegir.
-- **Videos:** donde está el mayor ahorro de espacio. Requiere decidir la dependencia (Media3 Transformer) y si va como opción del usuario.
+- **Videos:** donde está el mayor ahorro de espacio. Requiere definir la dependencia (Media3 Transformer) y si ofrecemos una opción en ajustes.
 - **Matriz de casos difíciles:** probar una foto HEIC real y un video de más de 1 GB.
 - **Fotos viejas en JPEG:** no se recomprimen.

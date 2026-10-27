@@ -6,9 +6,9 @@ Registro de problemas investigados y resueltos: qué pasó, qué se midió, qué
 
 Siempre que un trabajo de **corrección, refactorización u optimización** siga este camino:
 
-1. Se encuentra un problema (lo reporta el usuario, aparece en una prueba o en una revisión).
-2. Se hacen pruebas o mediciones para elegir la mejor solución.
-3. Se implementa la solución y se comprueba.
+1. Detectamos un problema en equipo (al probar la app, revisar el código o analizar métricas).
+2. Hacemos pruebas o mediciones para elegir la mejor solución.
+3. Implementamos la solución y la comprobamos.
 
 No hace falta para cambios directos sin investigación (una corrección obvia, un texto, un ajuste visual).
 

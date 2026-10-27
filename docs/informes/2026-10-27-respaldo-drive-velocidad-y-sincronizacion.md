@@ -10,12 +10,12 @@
 
 ## Resumen
 
-El usuario pidió optimizar el respaldo en Google Drive cumpliendo tres objetivos y un flujo automático:
+Nos propusimos optimizar el respaldo en Google Drive cumpliendo tres objetivos de rendimiento y un flujo de sincronización automática:
 
 1. **Carga rápida:** sabiendo que casi todos los archivos (fotos WebP 2400 px q70 de ~124 KB) pesan menos de 5 MB, usar una conexión directa no reanudable y paralelismo.
 2. **Incremental:** nunca volver a subir lo que ya está en `appDataFolder`.
-3. **En segundo plano:** que el usuario no tenga que quedarse mirando una barra de progreso en la pantalla de Respaldo.
-4. **Sincronización automática por Wi-Fi:** subir en segundo plano apenas el usuario agrega o edita algo (si hay Wi-Fi; si no, dejarlo pendiente para cuando vuelva el Wi-Fi o se reabra la app) y, al abrir la app con Wi-Fi, buscar si otro dispositivo actualizó el respaldo en Drive para fusionarlo automáticamente.
+3. **En segundo plano:** no obligar a quedarse mirando una barra de progreso en la pantalla de Respaldo.
+4. **Sincronización automática por Wi-Fi:** subir en segundo plano apenas se agrega o edita algo (si hay Wi-Fi; si no, dejarlo pendiente para cuando vuelva el Wi-Fi o se reabra la app) y, al abrir la app con Wi-Fi, buscar si otro dispositivo actualizó el respaldo en Drive para fusionarlo automáticamente.
 
 Después de medir todas las variantes reales contra `appDataFolder` y un servidor de control (Cloudflare) en el Pixel 8:
 
@@ -35,10 +35,10 @@ Después de medir todas las variantes reales contra `appDataFolder` y un servido
 
 | Fase | Hecho |
 | --- | --- |
-| Sesión previa (Claude Code) | Se implementa `multipart` para ≤ 5 MB, paralelismo de a 8 en `DriveBackupManager`, fusión previa automática (`NeedsMerge` → fusiona y sube en vez de bloquear con diálogo) y `DriveSyncWorker` para correr en segundo plano (`99dcace`). Se arma `DriveBenchReceiver` para medir en el Pixel 8, pero se agota la cuota antes de completar las mediciones y falta la sincronización reactiva al agregar contenido y al abrir la app. |
-| Retome (Antigravity) | Se inspecciona el estado en el Pixel 8 y se detecta por qué `DriveBenchWorker` se cortaba con la pantalla apagada en Android 12+ (`ForegroundServiceStartNotAllowedException`). |
-| Mediciones en Pixel 8 | Se corren todas las baterías de `DriveBench` en el Pixel 8: control contra Cloudflare (`cf-x1`, `cf-x8`), `resumable-x1`, `multipart-x1/x4/x8/x12`, comparación HTTP/2 vs HTTP/1.1 (`-h1`) y comparación `image/webp` vs `application/octet-stream` con las 16 fotos reales del usuario (`real-x8`, `realbin-x8`). |
-| Implementación | Se corrige el inicio en segundo plano de `DriveSyncWorker`, se paraleliza el borrado de obsoletos en `DriveBackupManager` y se implementa la sincronización automática por Wi-Fi al modificar datos locales (`onLocalChange` + `pendingSync`) y al abrir la app (`onAppOpened` + `syncNow`). |
+| Primera etapa (con Claude Code) | Implementamos `multipart` para ≤ 5 MB, paralelismo de a 8 en `DriveBackupManager`, fusión previa automática (`NeedsMerge` → fusiona y sube en vez de bloquear con diálogo) y `DriveSyncWorker` para correr en segundo plano (`99dcace`). Armamos `DriveBenchReceiver` para medir en el Pixel 8, pero se agotó la cuota del agente antes de completar las mediciones y quedó pendiente la sincronización reactiva al agregar contenido y al abrir la app. |
+| Retome (con Antigravity) | Inspeccionamos el estado en el Pixel 8 y detectamos por qué `DriveBenchWorker` se cortaba con la pantalla apagada en Android 12+ (`ForegroundServiceStartNotAllowedException`). |
+| Mediciones en Pixel 8 | Corrimos todas las baterías de `DriveBench` en el Pixel 8: control contra Cloudflare (`cf-x1`, `cf-x8`), `resumable-x1`, `multipart-x1/x4/x8/x12`, comparación HTTP/2 vs HTTP/1.1 (`-h1`) y comparación `image/webp` vs `application/octet-stream` con las 16 fotos reales de `media/` (`real-x8`, `realbin-x8`). |
+| Implementación | Corregimos el inicio en segundo plano de `DriveSyncWorker`, paralelizamos el borrado de obsoletos en `DriveBackupManager` e implementamos la sincronización automática por Wi-Fi al modificar datos locales (`onLocalChange` + `pendingSync`) y al abrir la app (`onAppOpened` + `syncNow`). |
 | Verificación | 42 unit tests y 80 tests instrumentados en verde en el Pixel 8, más prueba en vivo en el dispositivo verificando la subida automática a los ~3 s de crear un código. |
 
 ---
@@ -135,7 +135,7 @@ Se probó una hipótesis adicional: ¿tarda más Drive cuando ve un MIME `image/
 
 ## Qué salió bien / qué se puede mejorar
 
-- **Qué salió bien:** medir contra un servidor de control (`speed.cloudflare.com`) permitió demostrar en minutos que el cuello de botella no era la conexión Wi-Fi del usuario sino el RTT por archivo de `appDataFolder`, orientando toda la solución a reducir viajes HTTP por archivo (`multipart`) y paralelizar de a 8 sobre HTTP/2.
+- **Qué salió bien:** medir contra un servidor de control (`speed.cloudflare.com`) nos permitió demostrar en minutos que el cuello de botella no era nuestra conexión Wi-Fi sino el RTT por archivo de `appDataFolder`, orientando toda la solución a reducir viajes HTTP por archivo (`multipart`) y paralelizar de a 8 sobre HTTP/2.
 - **Qué se puede mejorar:** cuando se usa `WorkManager` para pruebas de diagnóstico (`DriveBenchWorker`), usar siempre `enqueueUniqueWork` con `ExistingWorkPolicy.REPLACE`; con `enqueue` suelto, un worker interrumpido por una reinstalación de APK vuelve a arrancar en paralelo con la nueva corrida y ensucia los tiempos hasta que termina.
 
 ---

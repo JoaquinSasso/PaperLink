@@ -17,9 +17,9 @@ App Android que vincula un **código corto de 4 caracteres** (escrito a mano en 
 
 Todo trabajo de **corrección, refactorización u optimización** que siga este camino se documenta en `docs/informes/`:
 
-1. Se encuentra un problema (lo reporta el usuario, aparece en una prueba o en una revisión).
-2. Se hacen pruebas o mediciones para elegir la mejor solución.
-3. Se implementa la solución y se comprueba.
+1. Detectamos un problema en equipo (al probar la app, revisar el código o analizar métricas).
+2. Hacemos pruebas o mediciones para elegir la mejor solución.
+3. Implementamos la solución y la comprobamos.
 
 - Un archivo por tema: `docs/informes/AAAA-MM-DD-tema-corto.md`, con narrativa de postmortem: resumen con tabla antes/después, línea de tiempo, hipótesis con sus mediciones (**también las descartadas**), decisión, bugs encontrados en el camino, verificación, qué salió bien y qué se puede mejorar, pendientes. La estructura completa y el índice están en `docs/informes/README.md`.
 - Agregalo al índice de `docs/informes/README.md` y enlazalo desde `docs/PLAN.md` (sección del tema y "Registro de decisiones").

@@ -9,13 +9,13 @@ Actualizado: 27/10/2026.
 - **Hechas:** fases 0 a 3. **Fase 4 implementada** (hecha con Antigravity y revisada/corregida con Claude Code), todavía sin cerrar. Todo commiteado en `master`, sin push. Base de datos en versión 4.
 - **Para cerrar la Fase 4 (lo demás ya está verificado):**
   1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual (en una instalación limpia): Drive no debe cambiar y la app debe avisar que el respaldo automático quedó en pausa.
-- **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
+- **Pendiente de Fase 3:** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
 - **Siguiente después:** Fase 5 (pulido y publicación).
 - **Respaldo en Drive más rápido y sincronización automática por Wi-Fi (27/10/2026):** subida `multipart` para ≤ 5 MB y hasta 8 archivos en paralelo sobre HTTP/2 (16 fotos de 124 KB bajan de 74,1 s a 3,8 s: **19,5× más rápido**), respaldo manual en segundo plano (`DriveSyncWorker`) y sincronización automática por Wi-Fi al crear/editar/purgar contenido (con *debounce* de 3 s y cola pendiente `pendingSync` si no hay Wi-Fi) y al abrir la app (fusiona cambios hechos en otro dispositivo sin volver a subir si no hubo cambios locales). Ver [`docs/informes/2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md`](informes/2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md).
-- **Carga de varias fotos más rápida (27/10/2026):** 3 fotos a la vez y código visible tras la primera (ver "Carga de fotos" más abajo). Probado por el usuario con 25 fotos: código a los 9 ms y todo guardado en 4,2 s (logs de debug `Batch: …`). Compartir desde otra app sigue igual (paso siguiente).
-- **Fotos en WebP (27/10/2026):** las fotos nuevas se guardan en WebP 2400 px q70 (≈ −79 %). Falta que el usuario saque una foto con la cámara de la app y la vea en el visor (los tests instrumentados ya lo cubren en el Pixel; la prueba manual no se pudo hacer porque el teléfono estaba bloqueado). Las fotos viejas quedan en JPEG. Posible siguiente paso: comprimir videos (decisión pendiente: dependencia Media3 Transformer y opción para el usuario).
+- **Carga de varias fotos más rápida (27/10/2026):** 3 fotos a la vez y código visible al instante (ver "Carga de fotos" más abajo). Probado en el Pixel 8 con 25 fotos: código a los 9 ms y todo guardado en 4,2 s (logs de debug `Batch: …`). Compartir desde otra app sigue igual (paso siguiente).
+- **Fotos en WebP (27/10/2026):** las fotos nuevas se guardan en WebP 2400 px q70 (≈ −79 %). Falta probar manualmente sacar una foto con la cámara de la app y verla en el visor (los tests instrumentados ya lo cubren en el Pixel; la prueba en vivo no se pudo hacer porque el teléfono estaba bloqueado). Las fotos viejas quedan en JPEG. Posible siguiente paso: comprimir videos (decisión pendiente: dependencia Media3 Transformer y si va como opción en ajustes).
 - **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4 y cubiertas por tests; la restauración completa se probó en el teléfono.
-- **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (el usuario no tenía archivos así), dispositivo de gama baja y build de release con R8 → Fase 5.
+- **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (no teníamos archivos así a mano), dispositivo de gama baja y build de release con R8 → Fase 5.
 - **Herramientas:** el trabajo de las fases 0 a 3 se hizo con Claude Code; desde acá se puede seguir con Antigravity (`AGENTS.md`, `.agents/rules/`, `.agents/workflows/`: `/fase`, `/probar`, `/retomar`) o con Claude Code (`CLAUDE.md` importa `AGENTS.md`).
 
 ## 1. Contexto y diagnóstico
@@ -258,9 +258,9 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 
 Informe completo: [`docs/informes/2026-10-27-fotos-espacio-y-velocidad.md`](informes/2026-10-27-fotos-espacio-y-velocidad.md).
 
-Pedido del usuario: el respaldo en Drive crecía rápido (unos 590 KB por foto de cuaderno). Comprimir en un ZIP no sirve: medido en el teléfono, gzip ahorra 0,25 % sobre JPEG, y además rompería el respaldo incremental. Se achica al **guardar** (ahorra en el teléfono y en Drive por igual).
+Motivación: el respaldo en Drive crecía rápido (unos 590 KB por foto de cuaderno). Comprimir en un ZIP no sirve: medido en el teléfono, gzip ahorra 0,25 % sobre JPEG, y además rompería el respaldo incremental. Decidimos achicar al **guardar** (ahorra en el teléfono y en Drive por igual).
 
-Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial impreso, pizarrones), codificadas en el Pixel 8 con los codificadores de Android, y recortes ampliados para comparar la legibilidad:
+Prueba con 25 fotos reales de estudio (cuaderno en lápiz y birome, parcial impreso, pizarrones), codificadas en el Pixel 8 con los codificadores de Android, y recortes ampliados para comparar la legibilidad:
 
 | Variante | Promedio | Frente a JPEG 3000 q85 | 400 fotos |
 | --- | --- | --- | --- |
@@ -273,19 +273,19 @@ Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial imp
 
 - La letra se lee en todas las variantes WebP al hacer zoom; con q70 aparece algo de *banding* en reflejos de pizarrón, no en el trazo.
 - **HEIC descartado:** `HeifWriter` usa el codificador de video por hardware, que en el Pixel casi ignora la calidad pedida y da archivos más pesados que JPEG; además depende del modelo, suma una dependencia y no se abre en Android 8–9.
-- WebP codifica en ~0,4 s por foto (JPEG ~0,04 s); no se nota porque las fotos se guardan de a una.
+- WebP codifica en ~0,4 s por foto (JPEG ~0,04 s); no se nota cuando las fotos se guardan de a una.
 - Antes de Android 11 se usa `CompressFormat.WEBP`, que con calidad < 100 también es con pérdida. Las transparencias se siguen componiendo sobre blanco.
 
 ### Carga de fotos (27/10/2026)
 
 Informe completo: [`docs/informes/2026-10-27-fotos-espacio-y-velocidad.md`](informes/2026-10-27-fotos-espacio-y-velocidad.md).
 
-Pedido del usuario: cargar 25 fotos de la galería se sentía muy lento. Medición en el Pixel 8 con fotos del tamaño de las de la cámara (4080×3072, EXIF 90): ~1 s por foto, de los cuales ~0,7 s son la codificación WebP (Android no permite elegir un modo más rápido). En paralelo: de a 2, 0,55 s por foto; de a 3, 0,42 s; de a 4, 0,37 s.
+Motivación: cargar 25 fotos de la galería se sentía muy lento. Medición en el Pixel 8 con fotos del tamaño de las de la cámara (4080×3072, EXIF 90): ~1 s por foto, de los cuales ~0,7 s son la codificación WebP (Android no permite elegir un modo más rápido). En paralelo: de a 2, 0,55 s por foto; de a 3, 0,42 s; de a 4, 0,37 s.
 
 - **Optimización:** `BatchImporter` importa 3 a la vez (1 en teléfonos con poca RAM). En Android 9+ se decodifica con `ImageDecoder` directo al tamaño final (aplica la orientación EXIF y no carga la imagen completa en memoria, lo que permite el paralelismo). La copia temporal del original ya no hace `fsync` cuando se va a re-codificar.
-- **Carga progresiva:** al crear un código desde la galería o archivos, el código se guarda **vacío** en la base antes de importar nada y su pantalla se abre al instante (en la primera versión se esperaba la primera foto: ~0,64 s con 25 fotos, y el usuario notó la espera de la primera tanda). Todos los elementos se agregan en segundo plano en el orden elegido, con una tarjeta de progreso (pantalla del código, detalle y Home) y opción de cancelar (lo guardado queda). Si alguno falla se avisa cuántos; si no se pudo guardar ninguno, el código queda (ya está anotado) y se avisa que se vuelvan a agregar con "Agregar más". Los códigos vacíos se incluyen en el respaldo para que sigan reservados. Al agregar a un código existente todo va en segundo plano. La cámara sigue creando el código con la primera foto.
+- **Carga progresiva:** al crear un código desde la galería o archivos, el código se guarda **vacío** en la base antes de importar nada y su pantalla se abre al instante (en la primera versión se esperaba la primera foto: ~0,64 s con 25 fotos, y notamos la demora de la primera tanda). Todos los elementos se agregan en segundo plano en el orden elegido, con una tarjeta de progreso (pantalla del código, detalle y Home) y opción de cancelar (lo guardado queda). Si alguno falla se avisa cuántos; si no se pudo guardar ninguno, el código queda (ya está anotado) y se avisa que se vuelvan a agregar con "Agregar más". Los códigos vacíos se incluyen en el respaldo para que sigan reservados. Al agregar a un código existente todo va en segundo plano. La cámara sigue creando el código con la primera foto.
 - **Medición en el teléfono (25 fotos de la galería, Pixel 8):** primera versión, código a los 0,64 s y las 25 guardadas en 4,7 s; con el código vacío al instante, **código a los 9 ms** y las 25 guardadas en **4,2 s**, sin errores. Antes de estos cambios, entre 15 y 25 s.
-- **Si la app se cierra a mitad:** la carga queda anotada en preferencias (`pendingImports`); al volver, la Home avisa "se guardaron X de N" para que el usuario agregue los que faltan. No se retoma sola (requeriría permisos persistentes y no funciona con compartir).
+- **Si la app se cierra a mitad:** la carga queda anotada en preferencias (`pendingImports`); al volver, la Home avisa "se guardaron X de N" para poder agregar los que faltan. No se retoma sola (requeriría permisos persistentes y no funciona con compartir).
 - **Compartir desde otra app:** sin cambios por ahora (copia y re-codifica todo antes de elegir destino). Siguiente paso: copiar crudo (~40 ms por foto) y re-codificar después de elegir.
 - **Bugs encontrados por los tests nuevos y corregidos:**
   - Con varias importaciones a la vez y `media/` todavía inexistente (instalación nueva), `mkdirs()` devolvía `false` en la que perdía la carrera y esa foto fallaba. Ahora solo falla si la carpeta sigue sin existir.
@@ -319,6 +319,6 @@ Pedido del usuario: cargar 25 fotos de la galería se sentía muy lento. Medici�
 | 2026-10-27 | Fotos nuevas en WebP 2400 px calidad 70 (antes JPEG 3000 px q85) | −79 % de espacio en el teléfono y en Drive con la letra igual de legible; ZIP no ahorra y HEIC pesa más en Android |
 | 2026-10-27 | Carga de varias fotos: 3 a la vez y código visible tras la primera, resto en segundo plano | Cargar 25 fotos tardaba ~25 s; ahora el código aparece en ~1 s y el total baja 2–3 veces |
 | 2026-10-27 | Si la app se cierra a mitad de una carga, avisar (no retomar sola) | Retomar pediría permisos persistentes y una cola; la ventana es de pocos segundos |
-| 2026-10-27 | Al cargar desde la galería o archivos, el código se crea vacío al instante y los elementos llegan en segundo plano | Que el usuario anote el código sin esperar; si nada se guarda, el código queda y se avisa (decisión del usuario sobre la garantía 8) |
+| 2026-10-27 | Al cargar desde la galería o archivos, el código se crea vacío al instante y los elementos llegan en segundo plano | Poder anotar el código sin esperar; si nada se guarda, el código queda y se avisa (ajuste sobre la garantía 8) |
 | 2026-10-27 | Subida a Drive con `multipart` (≤ 5 MB) y 8 en paralelo sobre HTTP/2; respaldo en segundo plano (`DriveSyncWorker`) | 16 fotos de 124 KB bajan de 74,1 s a 3,8 s (19,5×); el cuello de botella era la latencia por archivo de Drive (~1,9 s RTT), no el Wi-Fi (`docs/informes/2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md`) |
 | 2026-10-27 | Sincronización automática con Drive por Wi-Fi al agregar/editar contenido y al abrir la app | Subida transparente apenas hay Wi-Fi (`pendingSync` si no hay) y fusión automática de cambios hechos en otro dispositivo al abrir la app sin subir un manifest redundante |
