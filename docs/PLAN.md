@@ -8,8 +8,7 @@ Actualizado: 26/10/2026.
 
 - **Hechas:** fases 0 a 3. **Fase 4 implementada** (hecha con Antigravity y revisada/corregida con Claude Code), todavía sin cerrar. Todo commiteado en `master`, sin push. Base de datos en versión 4.
 - **Para cerrar la Fase 4 (lo demás ya está verificado):**
-  1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual: Drive no debe cambiar y la Home debe avisar que el respaldo automático está en pausa.
-  2. Dejar en el repo (por ejemplo `docs/GOOGLE_CLOUD.md`) las instrucciones de configuración de Google Cloud que pedía el plan: no están.
+  1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual (en una instalación limpia): Drive no debe cambiar y la app debe avisar que el respaldo automático quedó en pausa.
 - **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
 - **Siguiente después:** Fase 5 (pulido y publicación).
 - **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4 y cubiertas por tests; la restauración completa se probó en el teléfono.
@@ -225,14 +224,15 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 ### Fase 4 — Respaldo
 - [x] Exportar e importar ZIP.
 - [x] Confirmar `drive.appdata` vs `drive.file` (sección 7).
-- [ ] Instrucciones para que el usuario configure Google Cloud (consentimiento, client IDs, SHA-1).
+- [x] Instrucciones para que el usuario configure Google Cloud (consentimiento, client IDs, SHA-1): `docs/GOOGLE_CLOUD.md`.
 - [x] Autorización, subida incremental, restauración, pantalla de ajustes de respaldo.
 - [x] `data_extraction_rules.xml`.
 - **Criterio (en dispositivo):** respaldar, desinstalar, reinstalar, restaurar y ver todos los vínculos con sus archivos.
 - **Verificación:**
   - **Criterio cumplido (26/10/2026, Pixel 8, probado por el usuario):** respaldar en Drive, desinstalar, reinstalar, restaurar y ver todos los códigos con sus archivos. Se probó con la versión anterior a la corrección de seguridad del respaldo; esa corrección no cambió la restauración (solo agrega que, al terminar, se guarda el id del manifest fusionado).
   - Después de la corrección (27/10/2026): 42 unit tests y 65 instrumentados en verde en el Pixel 8 (incluidos los 6 nuevos de `BackupTest`); la app abre sin errores en logcat.
-  - Pendiente: "Ahora no" en el aviso de respaldo encontrado y las instrucciones de Google Cloud en el repo (ver "Estado actual").
+  - Pendiente: "Ahora no" en el aviso de respaldo encontrado (ver "Estado actual").
+  - Configuración de Google Cloud documentada en `docs/GOOGLE_CLOUD.md`. Ojo para la Fase 5: antes de publicar hay que pasar la pantalla de consentimiento a *En producción* (en *Prueba* las autorizaciones vencen a los 7 días) y crear el cliente Android con la SHA-1 de Play App Signing.
 - **Notas y decisiones:**
   - Decisión pendiente resuelta: **`drive.appdata`** (carpeta oculta de la app, scope no sensible). Cliente REST de Drive v3 con OkHttp, autorización con `Identity.getAuthorizationClient()`.
   - ZIP: `manifest.json` (formato versión 1) + `media/`; al importar se valida el manifest y las rutas, se verifica el SHA-256 de cada archivo antes del rename atómico y se fusiona por id en una transacción (`LinkDao.mergeBackup`: solo agrega, conserva la etiqueta local).
@@ -248,6 +248,7 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 - [ ] Revisar textos ES/EN, íconos, onboarding de una pantalla.
 - [ ] Quitar `READ_MEDIA_*` y `READ_EXTERNAL_STORAGE` del manifest.
 - [ ] Actualizar README.
+- [ ] Google Cloud para publicar: pantalla de consentimiento en *En producción* y cliente Android con la SHA-1 de Play App Signing (`docs/GOOGLE_CLOUD.md`, paso 5).
 - **Criterio:** `bundleRelease` instalado vía `bundletool` funciona de punta a punta.
 
 ## 10. Registro de decisiones
