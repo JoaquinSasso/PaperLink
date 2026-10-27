@@ -112,6 +112,9 @@ interface LinkDao {
     @Query("SELECT relativePath FROM attachments WHERE relativePath IS NOT NULL")
     suspend fun allFilePaths(): List<String>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM attachments WHERE relativePath = :path)")
+    suspend fun isFileReferenced(path: String): Boolean
+
     @Query("SELECT code FROM links WHERE deletedAt IS NULL")
     suspend fun allCodes(): List<String>
 

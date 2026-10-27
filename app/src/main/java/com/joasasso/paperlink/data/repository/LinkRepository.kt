@@ -344,7 +344,21 @@ class LinkRepository(
 
     /** Borra archivos copiados que no llegaron a la base. Corre aunque se haya cancelado. */
     private suspend fun discardFiles(paths: List<String>) {
-        withContext(NonCancellable) { deleteFiles(paths) }
+        discardUnreferenced(paths)
+    }
+
+    /**
+     * Borra archivos importados que no llegaron a la base. Solo borra los que ninguna fila
+     * referencia: una operación de Room puede confirmarse y aun así lanzar la cancelación al
+     * volver, y borrar ese archivo dejaría una fila sin su archivo (garantía 1). Corre aunque se
+     * haya cancelado.
+     */
+    suspend fun discardUnreferenced(paths: List<String>) {
+        withContext(NonCancellable) {
+            deleteFiles(paths.filterNot { path ->
+                dao.isFileReferenced(path).also { if (it) log("Kept $path: already referenced") }
+            })
+        }
     }
 
     /** Si un archivo no se puede borrar, el barrido de huérfanos lo reintenta en el próximo arranque. */

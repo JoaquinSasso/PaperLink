@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
@@ -12,6 +13,7 @@ import android.provider.OpenableColumns
 import android.system.ErrnoException
 import android.system.OsConstants
 import android.webkit.MimeTypeMap
+import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.joasasso.paperlink.data.backup.BackupException
@@ -35,6 +37,7 @@ import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.util.UUID
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Único componente que toca el disco. Los archivos del usuario viven en `filesDir/media/`
@@ -84,14 +87,16 @@ class AttachmentStore(
         val estimated = (declaredSize ?: 0L) * (if (reencode) 2 else 1)
         checkSpace(estimated)
 
-        if (!mediaDir.isDirectory && !mediaDir.mkdirs()) throw IOException("Cannot create $mediaDir")
+        // mkdirs devuelve false si otra importación simultánea la acaba de crear: se verifica después.
+        if (!mediaDir.mkdirs() && !mediaDir.isDirectory) throw IOException("Cannot create $mediaDir")
         val id = UUID.randomUUID().toString()
         val extension = extensionFor(mimeType, uri)
         // Nombres distintos: si el original ya es WebP, no debe pisarse con el re-codificado.
         val originalPart = File(mediaDir, "$id.original$PART_SUFFIX")
         val encodedPart = File(mediaDir, "$id.$IMAGE_EXTENSION$PART_SUFFIX")
         try {
-            val original = copyFrom(uri, originalPart, declaredSize, onProgress)
+            // Si se va a re-codificar, la copia es temporal: no hace falta fsync (se hace del resultado).
+            val original = copyFrom(uri, originalPart, declaredSize, onProgress, sync = !reencode)
             if (reencode) {
                 val encoded = reencodeImage(originalPart, encodedPart)
                 if (encoded != null) {
@@ -99,6 +104,7 @@ class AttachmentStore(
                     return@withContext commit(encodedPart, "$id.$IMAGE_EXTENSION", kind, IMAGE_MIME_TYPE, encoded)
                 }
                 log("Image not decodable, keeping original ($mimeType)")
+                syncFile(originalPart)
             }
             commit(originalPart, "$id.$extension", kind, mimeType, original)
         } catch (t: Throwable) {
@@ -110,7 +116,7 @@ class AttachmentStore(
 
     /** Archivo nuevo donde la cámara escribe una foto; se importa con [import] y se borra con [deleteCapture]. */
     suspend fun newCaptureFile(): File = withContext(ioDispatcher) {
-        if (!capturesDir.isDirectory && !capturesDir.mkdirs()) throw IOException("Cannot create $capturesDir")
+        if (!capturesDir.mkdirs() && !capturesDir.isDirectory) throw IOException("Cannot create $capturesDir")
         File(capturesDir, "${UUID.randomUUID()}.jpg")
     }
 
@@ -183,7 +189,7 @@ class AttachmentStore(
         }
         val estimated = estimatedSize ?: 0L
         checkSpace(estimated)
-        if (!mediaDir.isDirectory && !mediaDir.mkdirs()) throw IOException("Cannot create $mediaDir")
+        if (!mediaDir.mkdirs() && !mediaDir.isDirectory) throw IOException("Cannot create $mediaDir")
         val part = File(mediaDir, "${target.name}.restore$PART_SUFFIX")
         try {
             val written = writeSynced(part) { out -> write(out) }
@@ -265,10 +271,11 @@ class AttachmentStore(
         dest: File,
         totalBytes: Long?,
         onProgress: (Long, Long?) -> Unit,
+        sync: Boolean,
     ): Written {
         val input = openSource(uri)
         return input.use { source ->
-            writeSynced(dest) { out ->
+            writeSynced(dest, sync) { out ->
                 val buffer = ByteArray(BUFFER_SIZE)
                 var copied = 0L
                 while (true) {
@@ -297,16 +304,9 @@ class AttachmentStore(
      * Devuelve null si la imagen no se puede decodificar (formato no soportado o sin memoria).
      */
     private suspend fun reencodeImage(source: File, dest: File): Written? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(source.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
         val bitmap = try {
-            val options = BitmapFactory.Options().apply {
-                inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, IMAGE_MAX_SIDE_PX)
-            }
-            val decoded = BitmapFactory.decodeFile(source.path, options) ?: return null
-            orientAndScale(decoded, readExif(source))
+            val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) decodeScaled(source) else decodeScaledLegacy(source)
+            decoded?.let(::flattenAlpha) ?: return null
         } catch (e: OutOfMemoryError) {
             log("Out of memory decoding image", e)
             return null
@@ -331,6 +331,42 @@ class AttachmentStore(
             null
         }
 
+    /**
+     * Android 9+: decodifica directo al tamaño final (sin cargar la imagen completa en memoria) y
+     * aplica la orientación EXIF. Es lo que permite procesar varias fotos a la vez sin quedarse
+     * sin memoria. Devuelve null si no se puede decodificar.
+     */
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun decodeScaled(source: File): Bitmap? =
+        try {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(source)) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val longest = max(info.size.width, info.size.height)
+                if (longest > IMAGE_MAX_SIDE_PX) {
+                    val scale = IMAGE_MAX_SIDE_PX.toFloat() / longest
+                    decoder.setTargetSize(
+                        (info.size.width * scale).roundToInt().coerceAtLeast(1),
+                        (info.size.height * scale).roundToInt().coerceAtLeast(1),
+                    )
+                }
+            }
+        } catch (e: IOException) {
+            log("ImageDecoder could not decode image", e)
+            null
+        }
+
+    /** Android 8: `BitmapFactory` con submuestreo, y orientación y escala a mano. */
+    private fun decodeScaledLegacy(source: File): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(source.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, IMAGE_MAX_SIDE_PX)
+        }
+        val decoded = BitmapFactory.decodeFile(source.path, options) ?: return null
+        return orientAndScale(decoded, readExif(source))
+    }
+
     private fun orientAndScale(decoded: Bitmap, exif: ExifInterface?): Bitmap {
         val scale = IMAGE_MAX_SIDE_PX.toFloat() / max(decoded.width, decoded.height)
         val matrix = Matrix()
@@ -341,6 +377,10 @@ class AttachmentStore(
         val transformed = if (matrix.isIdentity) decoded
         else Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
         if (transformed !== decoded) decoded.recycle()
+        return transformed
+    }
+
+    private fun flattenAlpha(transformed: Bitmap): Bitmap {
         if (!transformed.hasAlpha()) return transformed
 
         // Las fotos de apuntes no necesitan transparencia: se compone sobre blanco (archivo más chico
@@ -394,15 +434,20 @@ class AttachmentStore(
     private class Written(val sizeBytes: Long, val sha256: String)
 
     /** Escribe [dest] calculando su SHA-256 y hace fsync antes de cerrar. */
-    private inline fun writeSynced(dest: File, write: (OutputStream) -> Unit): Written {
+    private inline fun writeSynced(dest: File, sync: Boolean = true, write: (OutputStream) -> Unit): Written {
         val digest = MessageDigest.getInstance("SHA-256")
         FileOutputStream(dest).use { file ->
             val out = DigestOutputStream(file.buffered(BUFFER_SIZE), digest)
             write(out)
             out.flush()
-            file.fd.sync()
+            if (sync) file.fd.sync()
         }
         return Written(dest.length(), digest.digest().toHex())
+    }
+
+    /** fsync de un archivo ya escrito (la copia temporal que termina siendo el archivo final). */
+    private fun syncFile(file: File) {
+        FileOutputStream(file, true).use { it.fd.sync() }
     }
 
     private fun sha256Of(file: File): String {
