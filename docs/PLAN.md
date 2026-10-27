@@ -4,12 +4,17 @@ Origen: auditoría del 23/10/2026. Este documento es la especificación de traba
 
 ## Estado actual (para retomar)
 
-Actualizado: 25/10/2026.
+Actualizado: 26/10/2026.
 
-- **Hechas:** fases 0, 1, 2 y 3 (todo commiteado en `master`, sin push). 33 unit tests y 54 instrumentados en verde. Base de datos en versión 4.
-- **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar). Si funciona, marcar esa parte del criterio de la Fase 3 como verificada; si no, corregirlo antes de la Fase 4.
-- **Siguiente: Fase 4 (respaldo).** Empezar por la decisión pendiente `drive.appdata` vs `drive.file` (sección 7). Va a requerir que el usuario configure Google Cloud (dejarle instrucciones paso a paso) y dependencias nuevas (WorkManager, autorización de Google); preguntar antes de agregarlas. OkHttp ya está disponible vía `coil-network-okhttp`.
-- **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 son de la Fase 4.
+- **Hechas:** fases 0 a 3. **Fase 4 implementada** (hecha con Antigravity y revisada/corregida con Claude Code), todavía sin cerrar. Todo commiteado en `master`, sin push. Base de datos en versión 4.
+- **Para cerrar la Fase 4:**
+  1. Correr los instrumentados con el teléfono conectado (los 6 tests nuevos de `BackupTest` todavía no corrieron en dispositivo).
+  2. Probar el criterio en el teléfono: respaldar en Drive, desinstalar, reinstalar, restaurar y ver todos los códigos con sus archivos. Probar también "Ahora no" en el aviso de respaldo encontrado (no debe tocar Drive).
+  3. Dejar en el repo (por ejemplo `docs/GOOGLE_CLOUD.md`) las instrucciones de configuración de Google Cloud que pedía el plan: no están.
+  4. Marcar el checklist y la verificación.
+- **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
+- **Siguiente después:** Fase 5 (pulido y publicación).
+- **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4, pendientes de la prueba en dispositivo.
 - **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (el usuario no tenía archivos así), dispositivo de gama baja y build de release con R8 → Fase 5.
 - **Herramientas:** el trabajo de las fases 0 a 3 se hizo con Claude Code; desde acá se puede seguir con Antigravity (`AGENTS.md`, `.agents/rules/`, `.agents/workflows/`: `/fase`, `/probar`, `/retomar`) o con Claude Code (`CLAUDE.md` importa `AGENTS.md`).
 
@@ -226,6 +231,16 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 - [ ] Autorización, subida incremental, restauración, pantalla de ajustes de respaldo.
 - [ ] `data_extraction_rules.xml`.
 - **Criterio (en dispositivo):** respaldar, desinstalar, reinstalar, restaurar y ver todos los vínculos con sus archivos.
+- **Estado (26/10/2026):** implementado; falta la verificación en dispositivo y las instrucciones de Google Cloud en el repo (ver "Estado actual"). Unit tests en verde; instrumentados compilan pero no corrieron con los últimos cambios.
+- **Notas y decisiones:**
+  - Decisión pendiente resuelta: **`drive.appdata`** (carpeta oculta de la app, scope no sensible). Cliente REST de Drive v3 con OkHttp, autorización con `Identity.getAuthorizationClient()`.
+  - ZIP: `manifest.json` (formato versión 1) + `media/`; al importar se valida el manifest y las rutas, se verifica el SHA-256 de cada archivo antes del rename atómico y se fusiona por id en una transacción (`LinkDao.mergeBackup`: solo agrega, conserva la etiqueta local).
+  - Drive: sube primero los archivos nuevos y al final el manifest; limpia manifests viejos y archivos huérfanos recién después (garantía 12). Ante 401 reintenta una vez y si sigue marca "volver a autorizar" (garantía 13). Respaldo diario con WorkManager, Wi-Fi y opcionalmente solo cargando.
+  - **Corrección tras la revisión (26/10/2026): un respaldo nunca achica lo que hay en Drive.** Se guarda el id del último `manifest.json` que este teléfono subió o restauró (`syncedManifestId`). Si el de Drive es otro y tiene códigos, `backupNow` se niega (`RemoteNotMerged`), se marca `remotePending` y la Home muestra un aviso; al conectar se ofrece restaurar (fusionar) y el respaldo automático se activa recién después. "Ahora no" ya no respalda (antes subía la base vacía y borraba todo en Drive). Las filas cuyo archivo falta en el teléfono pero sigue en Drive se conservan (antes la limpieza lo borraba de Drive).
+  - Sin respaldo automático de Android en la nube (`cloud-backup` excluye todo; `backup_rules.xml` igual para Android ≤ 11): restauraba la base y las preferencias sin las fotos, con "Drive activado", y el respaldo diario podía pisar Drive. La transferencia entre dispositivos (`device-transfer`) sí lleva base, `media/` y preferencias.
+  - Un respaldo o restauración a la vez (`Mutex` en `DriveBackupManager`). Subida reanudable (`uploadType=resumable`) para cualquier tamaño, en vez de multipart (pensada para ≤ 5 MB). Un respaldo exitoso ya no reactiva el respaldo automático si el usuario lo apagó mientras corría, ni lo reprograma.
+  - Garantía 13: si el respaldo está activo y nunca terminó bien, el aviso de 7 días cuenta desde que se activó (`driveEnabledAt`).
+  - Garantía 15: sugerencia en la Home al llegar a 5 códigos sin respaldo, descartable.
 
 ### Fase 5 — Pulido y publicación
 - [ ] Reglas de R8 revisadas y release probado en dispositivo.
@@ -255,3 +270,5 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 2026-10-23 | Borrar elementos sueltos con deshacer (esquema v4) | Caso real (foto equivocada); estrena el circuito de migraciones con test |
 | 2026-10-23 | telephoto para el zoom | Carga a resolución completa por partes; ~80 KB medidos en release |
 | 2026-10-25 | Guía única en `AGENTS.md`; soporte para Antigravity (`.agents/`) | El usuario sigue el proyecto con Antigravity; `CLAUDE.md` la importa |
+| 2026-10-26 | Respaldo en Drive con `drive.appdata` | Carpeta oculta, scope no sensible; sin necesidad de ver los archivos desde la PC |
+| 2026-10-26 | Un respaldo nunca achica Drive sin fusionar antes; sin Auto Backup de Android en la nube | Evita perder el respaldo al cambiar de teléfono o al tocar "Ahora no" |

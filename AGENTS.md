@@ -2,7 +2,7 @@
 
 App Android que vincula un **código corto de 4 caracteres** (escrito a mano en un cuaderno) con uno o más recursos digitales (fotos, video, audio, PDF, archivos, links, notas). Esa función es lo único innegociable del producto.
 
-**Estado:** reescritura en curso, fases 0 a 3 hechas. Antes de cualquier tarea leé `docs/PLAN.md`: arriba de todo está **"Estado actual"** (qué sigue), y cada fase tiene su checklist, sus notas y sus decisiones. Este archivo es la guía única: `CLAUDE.md` lo importa y `.agents/` (reglas y workflows de Antigravity) apunta acá.
+**Estado:** reescritura en curso, fases 0 a 3 hechas y la 4 implementada (falta cerrarla: ver "Estado actual"). Antes de cualquier tarea leé `docs/PLAN.md`: arriba de todo está **"Estado actual"** (qué sigue), y cada fase tiene su checklist, sus notas y sus decisiones. Este archivo es la guía única: `CLAUDE.md` lo importa y `.agents/` (reglas y workflows de Antigravity) apunta acá.
 
 ## Cómo trabajar con el usuario
 
@@ -17,6 +17,7 @@ App Android que vincula un **código corto de 4 caracteres** (escrito a mano en 
 
 - Kotlin 2.4, Jetpack Compose + Material 3, Navigation Compose con rutas tipadas (kotlinx.serialization)
 - Room 2.8 (KSP), DataStore Preferences, Coil 3, Coroutines + Flow, CameraX 1.6 (`camera-compose`), telephoto (zoom del visor), androidx.exifinterface
+- Respaldo: WorkManager, Google Identity (`play-services-auth`, scope `drive.appdata`), OkHttp (cliente REST de Drive v3 propio, sin `google-api-client`)
 - DI manual (`AppContainer` en `PaperLinkApp`); no agregar Hilt salvo que se pida
 - minSdk 26 · targetSdk/compileSdk 37 · AGP 9.2.1 · JVM 17 · base de datos versión 4
 - Paquete y `applicationId`: `com.joasasso.paperlink` (debug: `com.joasasso.paperlink.debug`)
@@ -42,9 +43,10 @@ App Android que vincula un **código corto de 4 caracteres** (escrito a mano en 
 - `data/local/` — `Entities.kt` (`Link`, `Attachment` con `Kind`, borrado lógico `deletedAt` en ambos), `LinkDao.kt` (único DAO; las transacciones son métodos `@Transaction` con cuerpo), `PaperLinkDatabase.kt`, `Migrations.kt`.
 - `data/files/AttachmentStore.kt` — **único componente que toca el disco**: importación atómica (`.part` + fsync + rename), SHA-256, chequeo de espacio, re-codificación JPEG (≤ 3000 px, EXIF), capturas de cámara en `filesDir/captures/`, barrido de huérfanos.
 - `data/repository/LinkRepository.kt` — crear/agregar en transacción (importa primero, limpia si falla), códigos generados con reintento ante choque, borrado lógico con deshacer y purga diferida, búsqueda por etiqueta sin tildes, mantenimiento al iniciar. `AttachmentSource`: `Content(uri)`, `Stored(ya importado)`, `WebUrl`, `Note`.
+- `data/backup/` — respaldo: `ZipBackupManager` (export/import manual), `DriveBackupManager` (incremental en `appDataFolder`; **nunca achica lo que hay en Drive**: si Drive tiene un respaldo que este teléfono no fusionó se niega a respaldar, y no borra en Drive archivos que una fila local todavía referencia), `DriveAppDataClient` (REST, subida reanudable), `DriveAuthManager`, `DriveBackupWorker` (diario). La fusión al restaurar es `LinkDao.mergeBackup` (por id, solo agrega).
 - `domain/` — funciones puras con unit tests: `CodeAlphabet` (26 caracteres, generación, validación), `CodeSuggestions`, `SearchText`, `WebLinks`.
 - `di/AppContainer.kt` — DI manual y `applicationScope` (trabajo que sobrevive a las pantallas).
-- `ui/navigation/NavGraph.kt` — rutas tipadas: Home, Onboarding, Camera, Code (tras crear), Share, Viewer, Detail. `MainActivity` traduce intents (compartir, acción `CAPTURE` del widget/atajo) a rutas.
+- `ui/navigation/NavGraph.kt` — rutas tipadas: Home, Onboarding, Camera, Code (tras crear), Share, Viewer, Detail, Backup. `MainActivity` traduce intents (compartir, acción `CAPTURE` del widget/atajo) a rutas.
 - `ui/screens/*` — una carpeta por pantalla (Screen + ViewModel con `Factory`). `ui/common/` — piezas compartidas: `CodeInputField`, `AddContentSheet`, `ContentImporter` (progreso y cancelar), `AttachmentThumbnail`, `messageRes()`.
 - `util/` — `log()`, `PdfDecoder` (miniaturas de PDF para Coil), `YouTubeUtils`. `widget/` — widget que abre la cámara.
 - `app/src/debug/` — `SeedReceiver` (carga/borra códigos de prueba; solo debug).
