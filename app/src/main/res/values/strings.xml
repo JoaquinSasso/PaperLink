@@ -209,10 +209,6 @@
     <string name="backup_success_drive">Google Drive backup completed.</string>
     <string name="backup_success_restore_up_to_date">Everything was already up to date.</string>
     <string name="backup_success_restore_counts">Restored: %1$d new codes, %2$d new items.</string>
-    <string name="backup_found_dialog_title">Backup found in Google Drive</string>
-    <string name="backup_found_dialog_message">There is a backup from %1$s with %2$d codes (%3$s). Do you want to restore it now?</string>
-    <string name="backup_found_dialog_restore">Restore</string>
-    <string name="backup_found_dialog_skip">Not now</string>
     <string name="home_restore_backup">Restore from backup</string>
     <string name="home_backup_suggest_title">Back up your codes</string>
     <string name="home_backup_suggest_body">Turn on Google Drive backup or export a ZIP so you do not lose your codes if you uninstall the app or change phones.</string>
@@ -227,9 +223,6 @@
     <string name="error_backup_network">Could not connect to Google Drive. Check your connection and try again.</string>
 
     <!-- Respaldo: protección del respaldo de Drive -->
-    <string name="error_backup_remote_not_merged">Google Drive has a backup that is not on this phone yet. Restore it first so nothing gets lost.</string>
-    <string name="backup_remote_skipped">Nothing was backed up, so the backup in Google Drive stays as it is. Automatic backup turns on after you restore it.</string>
-    <string name="home_backup_remote_pending_warning">Google Drive has a backup that is not on this phone. Automatic backup is paused until you restore it. Tap to open.</string>
 
     <!-- Cargas en segundo plano -->
     <string name="action_ok">OK</string>
@@ -239,4 +232,12 @@
     <string name="import_bg_failed_code">%1$s: %2$d of %3$d items could not be saved.</string>
     <string name="import_bg_all_failed">None of the %2$d items could be saved in %1$s. The code exists: add them again with Add more.</string>
     <string name="import_bg_interrupted">Saving to %1$s was interrupted: %2$d of %3$d items were saved. Add the missing ones from the code.</string>
+    <string name="drive_sync_channel">Google Drive backup</string>
+    <string name="drive_sync_merging">Joining the backup in Google Drive…</string>
+    <string name="drive_sync_waiting">Waiting for a connection to back up…</string>
+    <string name="drive_sync_backup_failed">Could not back up to Google Drive</string>
+    <string name="drive_sync_restore_failed">Could not restore from Google Drive</string>
+    <string name="drive_sync_restore_done">Restore from Google Drive completed</string>
+    <string name="drive_sync_background_hint">You can leave the app: it keeps going in the background.</string>
+    <string name="backup_success_drive_merged">Backup completed. %1$d codes and %2$d items from Google Drive were added to this phone.</string>
 </resources>

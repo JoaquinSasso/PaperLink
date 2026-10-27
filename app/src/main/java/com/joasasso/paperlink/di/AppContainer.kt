@@ -5,6 +5,7 @@ import android.content.Context
 import com.joasasso.paperlink.data.backup.DriveAppDataClient
 import com.joasasso.paperlink.data.backup.DriveAuthManager
 import com.joasasso.paperlink.data.backup.DriveBackupManager
+import com.joasasso.paperlink.data.backup.DriveSync
 import com.joasasso.paperlink.data.backup.WorkManagerBackupScheduler
 import com.joasasso.paperlink.data.backup.ZipBackupManager
 import com.joasasso.paperlink.data.files.AttachmentStore
@@ -65,4 +66,7 @@ class AppContainer(context: Context) {
             scheduler = WorkManagerBackupScheduler(context),
         )
     }
+
+    /** Respaldo y restauración manuales con Drive, en segundo plano. */
+    val driveSync: DriveSync by lazy { DriveSync(context) }
 }

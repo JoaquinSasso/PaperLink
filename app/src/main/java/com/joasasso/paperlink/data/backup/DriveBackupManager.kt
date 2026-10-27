@@ -4,11 +4,16 @@ import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.util.log
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -16,6 +21,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Resumen de un respaldo exitoso en Google Drive. */
 data class DriveBackupSummary(
@@ -23,14 +29,8 @@ data class DriveBackupSummary(
     val totalSizeBytes: Long,
     val uploadedFiles: Int,
     val totalLinks: Int,
-)
-
-/** Datos del respaldo existente en Google Drive (para ofrecer restaurarlo al iniciar sesión). */
-data class RemoteBackupInfo(
-    val createdAt: Long,
-    val linkCount: Int,
-    val attachmentCount: Int,
-    val totalSizeBytes: Long,
+    /** Lo que se sumó al teléfono desde Drive antes de respaldar (null si no hizo falta unir). */
+    val merged: MergeCounts? = null,
 )
 
 /** Programa o cancela la ejecución periódica del respaldo en segundo plano. */
@@ -49,8 +49,12 @@ interface BackupScheduler {
  * - Garantía 13: registra la fecha del último respaldo exitoso y marca `driveNeedsReauth` si
  *   Google Drive rechaza las credenciales o se revocó el permiso.
  * - Garantía 14: fusiona por `id` de attachment sin pisar códigos ni elementos existentes.
- * - Un respaldo nunca achica lo que hay en Drive sin que el usuario lo haya visto: si Drive tiene
- *   un respaldo que este teléfono no fusionó, [backupNow] se niega (ver [RemoteState]).
+ * - Un respaldo nunca achica lo que hay en Drive: si Drive tiene un respaldo que este teléfono no
+ *   fusionó, [backupNow] primero lo une (solo agrega) y recién después sube (ver [RemoteState]).
+ *
+ * Los archivos se suben y se bajan de a [transferParallelism] a la vez: con fotos de pocos cientos
+ * de KB casi todo el tiempo es espera de la red, no transferencia (Pixel 8 en Wi-Fi, 20 archivos de
+ * 300 KB: 2,3 s por archivo de a uno con subida reanudable; 0,23 s con 8 a la vez en un pedido).
  */
 class DriveBackupManager(
     private val store: AttachmentStore,
@@ -60,6 +64,7 @@ class DriveBackupManager(
     private val remote: DriveRemoteStore,
     private val scheduler: BackupScheduler,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val transferParallelism: Int = 8,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -77,14 +82,11 @@ class DriveBackupManager(
         /** El último respaldo de Drive lo subió o restauró este teléfono: se puede respaldar encima. */
         data object InSync : RemoteState
 
-        /** Drive tiene un respaldo que este teléfono no fusionó: hay que restaurarlo antes de respaldar. */
-        data class NeedsMerge(val info: RemoteBackupInfo) : RemoteState
+        /** Drive tiene un respaldo que este teléfono no fusionó: se une antes de respaldar. */
+        data object NeedsMerge : RemoteState
     }
 
-    /**
-     * Activa el respaldo periódico en Google Drive con las preferencias actuales. Llamarlo recién
-     * cuando [checkRemoteState] no devuelve [RemoteState.NeedsMerge] (o después de restaurar).
-     */
+    /** Activa el respaldo periódico en Google Drive con las preferencias actuales. */
     suspend fun enableDriveBackup() {
         val settings = preferences.backupSettings.first()
         preferences.setDriveBackupEnabled(true, clock())
@@ -111,16 +113,25 @@ class DriveBackupManager(
     }
 
     /**
+     * Comprueba que haya permiso para usar Drive. Si hace falta el consentimiento del usuario lanza
+     * [BackupException.AuthRequired] con la pantalla de Google para mostrar (antes de pasar a
+     * segundo plano, donde no se puede pedir).
+     */
+    suspend fun ensureAuthorized() {
+        withValidToken { }
+    }
+
+    /**
      * Consulta el estado del respaldo en `appDataFolder` sin modificar nada (ni local ni remoto).
      */
     suspend fun checkRemoteState(): RemoteState = withValidToken { token ->
-        remoteStateOf(token, remote.listFiles(token))
+        remoteStateOf(remote.listFiles(token))
     }
 
     /**
      * Ejecuta un respaldo incremental ahora:
-     * 1. Si Drive tiene un respaldo que este teléfono no fusionó, no hace nada y lanza
-     *    [BackupException.RemoteNotMerged] (nunca se pisa contenido que el teléfono no tiene).
+     * 1. Si Drive tiene un respaldo que este teléfono no fusionó, primero lo une a la base local
+     *    (nunca se pisa contenido que el teléfono no tiene). [onProgress] informa `merging = true`.
      * 2. Sube solo los archivos de `media/` que todavía no estén en `appDataFolder`.
      * 3. Sube el nuevo `manifest.json` al final.
      * 4. Recién después borra los manifests viejos y los archivos que ninguna fila referencia.
@@ -141,32 +152,26 @@ class DriveBackupManager(
     suspend fun restoreFromDrive(
         onProgress: (BackupProgress) -> Unit = {},
     ): MergeCounts = mutex.withLock {
-        withValidToken { token -> restoreLocked(token, onProgress) }
+        withValidToken { token -> restoreLocked(token, remote.listFiles(token), onProgress) }
     }
 
-    private suspend fun remoteStateOf(token: String, remoteFiles: List<RemoteDriveFile>): RemoteState {
+    private suspend fun remoteStateOf(remoteFiles: List<RemoteDriveFile>): RemoteState {
         // listFiles ordena del más nuevo al más viejo: el primero es el respaldo vigente.
         val manifestFile = remoteFiles.firstOrNull { it.name == BackupManifest.MANIFEST_FILE_NAME }
             ?: return RemoteState.None
-        if (manifestFile.id == preferences.backupSettings.first().syncedManifestId) return RemoteState.InSync
-        val manifest = downloadManifest(token, manifestFile.id)
-        if (manifest.links.isEmpty()) return RemoteState.None
-        return RemoteState.NeedsMerge(
-            RemoteBackupInfo(
-                createdAt = manifest.createdAt,
-                linkCount = manifest.links.size,
-                attachmentCount = manifest.attachments.size,
-                totalSizeBytes = manifest.attachments.sumOf { it.sizeBytes ?: 0L } + (manifestFile.size ?: 0L),
-            )
-        )
+        return if (manifestFile.id == preferences.backupSettings.first().syncedManifestId) {
+            RemoteState.InSync
+        } else {
+            RemoteState.NeedsMerge
+        }
     }
 
     private suspend fun backupLocked(token: String, onProgress: (BackupProgress) -> Unit): DriveBackupSummary {
         val remoteFiles = remote.listFiles(token)
-        val state = remoteStateOf(token, remoteFiles)
-        if (state is RemoteState.NeedsMerge) {
-            preferences.recordRemotePending()
-            throw BackupException.RemoteNotMerged(state.info)
+        val merged = if (remoteStateOf(remoteFiles) == RemoteState.NeedsMerge) {
+            restoreLocked(token, remoteFiles) { onProgress(it.copy(merging = true)) }
+        } else {
+            null
         }
         val existingNames = remoteFiles.mapTo(HashSet()) { it.name }
 
@@ -192,14 +197,15 @@ class DriveBackupManager(
         val mimeByPath = kept.filter { it.relativePath != null }.associate { it.relativePath!! to it.mimeType }
 
         onProgress(BackupProgress(0, toUpload.size))
-        toUpload.forEachIndexed { index, path ->
-            currentCoroutineContext().ensureActive()
+        val started = clock()
+        inParallel(toUpload) { path, done ->
             val length = store.length(path)
             store.readFile(path) { input ->
                 remote.uploadStream(token, path, mimeByPath[path] ?: DEFAULT_MIME_TYPE, length, input)
             }
-            onProgress(BackupProgress(index + 1, toUpload.size))
+            onProgress(BackupProgress(done(), toUpload.size))
         }
+        log("Drive backup: ${toUpload.size} files uploaded in ${clock() - started} ms")
 
         // El manifest se sube SIEMPRE al final (garantía 12).
         currentCoroutineContext().ensureActive()
@@ -236,11 +242,15 @@ class DriveBackupManager(
             totalSizeBytes = totalSize,
             uploadedFiles = toUpload.size,
             totalLinks = manifest.links.size,
+            merged = merged,
         )
     }
 
-    private suspend fun restoreLocked(token: String, onProgress: (BackupProgress) -> Unit): MergeCounts {
-        val remoteFiles = remote.listFiles(token)
+    private suspend fun restoreLocked(
+        token: String,
+        remoteFiles: List<RemoteDriveFile>,
+        onProgress: (BackupProgress) -> Unit,
+    ): MergeCounts {
         val manifestFile = remoteFiles.firstOrNull { it.name == BackupManifest.MANIFEST_FILE_NAME }
             ?: throw BackupException.NoRemoteBackup()
         val manifest = downloadManifest(token, manifestFile.id)
@@ -253,9 +263,7 @@ class DriveBackupManager(
         onProgress(BackupProgress(0, fileAttachments.size))
         val newlyRestoredPaths = mutableListOf<String>()
         try {
-            val buffer = ByteArray(BUFFER_SIZE)
-            fileAttachments.forEachIndexed { index, att ->
-                currentCoroutineContext().ensureActive()
+            inParallel(fileAttachments) { att, done ->
                 val path = att.relativePath!!
                 if (!store.hasMatchingFile(path, att.sha256)) {
                     val remoteEntry = remoteByName[path]
@@ -266,12 +274,12 @@ class DriveBackupManager(
                         estimatedSize = att.sizeBytes,
                     ) { out ->
                         remote.downloadFile(token, remoteEntry.id) { input ->
-                            copyStream(input, out, buffer)
+                            copyStream(input, out, ByteArray(BUFFER_SIZE))
                         }
                     }
-                    if (created) newlyRestoredPaths += path
+                    if (created) synchronized(newlyRestoredPaths) { newlyRestoredPaths += path }
                 }
-                onProgress(BackupProgress(index + 1, fileAttachments.size))
+                onProgress(BackupProgress(done(), fileAttachments.size))
             }
             val counts = repository.commitBackup(manifest, newlyRestoredPaths)
             preferences.recordDriveRestore(manifestFile.id)
@@ -279,6 +287,25 @@ class DriveBackupManager(
         } catch (t: Throwable) {
             repository.discardRestoredFiles(newlyRestoredPaths)
             throw t
+        }
+    }
+
+    /**
+     * Ejecuta [block] para cada elemento, de a [transferParallelism] a la vez. `done()` cuenta los
+     * terminados (para el progreso). Si uno falla se cancelan los demás y se propaga el error.
+     */
+    private suspend fun <T> inParallel(items: Collection<T>, block: suspend (T, done: () -> Int) -> Unit) {
+        val semaphore = Semaphore(transferParallelism)
+        val finished = AtomicInteger()
+        coroutineScope {
+            items.map { item ->
+                async {
+                    semaphore.withPermit {
+                        currentCoroutineContext().ensureActive()
+                        block(item) { finished.incrementAndGet() }
+                    }
+                }
+            }.awaitAll()
         }
     }
 

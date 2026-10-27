@@ -10,5 +10,12 @@
                 <action android:name="com.joasasso.paperlink.debug.UNSEED" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".debug.DriveBenchReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.joasasso.paperlink.debug.DRIVE_BENCH" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

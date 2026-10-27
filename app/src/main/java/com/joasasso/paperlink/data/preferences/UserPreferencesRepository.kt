@@ -38,8 +38,6 @@ data class BackupSettings(
      * otro, Drive tiene contenido que este teléfono no conoce y no se lo puede pisar.
      */
     val syncedManifestId: String? = null,
-    /** Drive tiene un respaldo que todavía no se fusionó en este teléfono (respaldo frenado). */
-    val remotePending: Boolean = false,
 ) {
     /**
      * True si el respaldo está activo y no hubo uno exitoso en más de 7 días (garantía 13).
@@ -83,7 +81,6 @@ class UserPreferencesRepository(
         val BACKUP_SUGGESTION_DISMISSED = booleanPreferencesKey("backup_suggestion_dismissed")
         val DRIVE_ENABLED_AT = longPreferencesKey("drive_enabled_at")
         val DRIVE_SYNCED_MANIFEST_ID = stringPreferencesKey("drive_synced_manifest_id")
-        val DRIVE_REMOTE_PENDING = booleanPreferencesKey("drive_remote_pending")
         val PENDING_IMPORTS = stringPreferencesKey("pending_imports")
     }
 
@@ -113,7 +110,6 @@ class UserPreferencesRepository(
             suggestionDismissed = preferences[PreferencesKeys.BACKUP_SUGGESTION_DISMISSED] ?: false,
             driveEnabledAt = preferences[PreferencesKeys.DRIVE_ENABLED_AT],
             syncedManifestId = preferences[PreferencesKeys.DRIVE_SYNCED_MANIFEST_ID],
-            remotePending = preferences[PreferencesKeys.DRIVE_REMOTE_PENDING] ?: false,
         )
     }
 
@@ -185,7 +181,6 @@ class UserPreferencesRepository(
     suspend fun recordDriveBackupSuccess(timestamp: Long, totalSizeBytes: Long, manifestId: String) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DRIVE_SYNCED_MANIFEST_ID] = manifestId
-            preferences[PreferencesKeys.DRIVE_REMOTE_PENDING] = false
             preferences[PreferencesKeys.LAST_BACKUP_AT] = timestamp
             preferences[PreferencesKeys.LAST_BACKUP_SIZE_BYTES] = totalSizeBytes
             preferences[PreferencesKeys.DRIVE_NEEDS_REAUTH] = false
@@ -197,14 +192,6 @@ class UserPreferencesRepository(
     suspend fun recordDriveRestore(manifestId: String) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DRIVE_SYNCED_MANIFEST_ID] = manifestId
-            preferences[PreferencesKeys.DRIVE_REMOTE_PENDING] = false
-        }
-    }
-
-    /** Se frenó un respaldo porque Drive tiene contenido que este teléfono no tiene. */
-    suspend fun recordRemotePending() {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DRIVE_REMOTE_PENDING] = true
         }
     }
 
@@ -218,7 +205,6 @@ class UserPreferencesRepository(
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DRIVE_BACKUP_ENABLED] = false
             preferences[PreferencesKeys.DRIVE_NEEDS_REAUTH] = false
-            preferences[PreferencesKeys.DRIVE_REMOTE_PENDING] = false
         }
     }
 

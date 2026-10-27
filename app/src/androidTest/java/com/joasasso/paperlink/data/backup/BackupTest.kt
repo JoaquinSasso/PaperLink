@@ -342,27 +342,66 @@ class BackupTest {
         repository.createLink(listOf(AttachmentSource.Content(dir.source(name, "$name-bytes".encodeToByteArray()))))
 
     @Test
-    fun newPhone_refusesToBackupOverUnmergedRemote_andLeavesDriveIntact() = runBlocking {
+    fun backupOverUnmergedRemote_mergesFirst_andDriveKeepsEverything() = runBlocking {
         val remote = FakeDriveRemoteStore()
-        sourceNode.createFileLink("a.bin")
-        sourceNode.createFileLink("b.bin")
+        val fromSource = listOf(sourceNode.createFileLink("a.bin"), sourceNode.createFileLink("b.bin"))
         drive(sourceNode, remote).backupNow()
-        val before = remote.names().sorted()
+        val sourceMedia = remote.names().filter { it.startsWith("media/") }
 
-        // Teléfono nuevo (vacío): conectar ve un respaldo sin fusionar y respaldar se niega.
+        // Otro teléfono, con un código propio, respalda: primero une lo de Drive y después sube.
+        val ownCode = targetNode.createFileLink("own.bin")
         val targetDrive = drive(targetNode, remote)
-        val state = targetDrive.checkRemoteState()
-        assertTrue(state is DriveBackupManager.RemoteState.NeedsMerge)
-        assertEquals(2, (state as DriveBackupManager.RemoteState.NeedsMerge).info.linkCount)
-        try {
-            targetDrive.backupNow()
-            fail("Expected RemoteNotMerged")
-        } catch (e: BackupException.RemoteNotMerged) {
-            assertEquals(2, e.info.linkCount)
-        }
+        assertEquals(DriveBackupManager.RemoteState.NeedsMerge, targetDrive.checkRemoteState())
+        val progress = mutableListOf<BackupProgress>()
+        val summary = targetDrive.backupNow { synchronized(progress) { progress += it } }
 
-        assertEquals("Drive no debe cambiar", before, remote.names().sorted())
-        assertTrue(targetNode.preferences.backupSettings.first().remotePending)
+        assertEquals(MergeCounts(addedLinks = 2, addedAttachments = 2), summary.merged)
+        assertEquals(1, summary.uploadedFiles)
+        assertTrue("Informa la unión", progress.any { it.merging })
+        assertEquals((fromSource + ownCode).toSet(), targetNode.repository.allCodes().toSet())
+        assertTrue("Drive no pierde archivos", remote.names().containsAll(sourceMedia))
+        assertEquals(DriveBackupManager.RemoteState.InSync, targetDrive.checkRemoteState())
+
+        // Un tercer teléfono que restaura ve los tres códigos con sus archivos.
+        val third = TestNode(context)
+        try {
+            drive(third, remote).restoreFromDrive()
+            assertEquals((fromSource + ownCode).toSet(), third.repository.allCodes().toSet())
+            assertEquals(3, third.dir.mediaFiles().size)
+        } finally {
+            third.close()
+        }
+    }
+
+    @Test
+    fun uploadsRunInParallel_andAFailureLeavesThePreviousBackup() = runBlocking {
+        val remote = FakeDriveRemoteStore().apply { uploadDelayMs = 50 }
+        repeat(8) { sourceNode.createFileLink("f$it.bin") }
+        val sourceDrive = drive(sourceNode, remote)
+
+        sourceDrive.backupNow()
+        assertTrue("Sube de a varios", remote.maxConcurrentUploads.get() in 2..8)
+        assertEquals(8, remote.names().count { it.startsWith("media/") })
+
+        // Un corte a mitad de la siguiente subida no toca el manifest vigente.
+        val manifestBefore = remote.names().count { it == BackupManifest.MANIFEST_FILE_NAME }
+        repeat(8) { sourceNode.createFileLink("g$it.bin") }
+        remote.failAfterUploads = remote.uploadOrder.size + 3
+        try {
+            sourceDrive.backupNow()
+            fail("Expected NetworkError")
+        } catch (_: BackupException.NetworkError) {
+            // Esperado
+        }
+        assertEquals(manifestBefore, remote.names().count { it == BackupManifest.MANIFEST_FILE_NAME })
+        assertEquals(DriveBackupManager.RemoteState.InSync, sourceDrive.checkRemoteState())
+
+        // El reintento sube solo lo que faltaba y nada dos veces.
+        remote.failAfterUploads = null
+        sourceDrive.backupNow()
+        val media = remote.uploadOrder.filter { it.startsWith("media/") }
+        assertEquals(16, media.size)
+        assertEquals(16, media.toSet().size)
     }
 
     @Test
@@ -376,8 +415,7 @@ class BackupTest {
         val targetDrive = drive(targetNode, remote)
         targetDrive.restoreFromDrive()
         assertEquals(DriveBackupManager.RemoteState.InSync, targetDrive.checkRemoteState())
-        targetDrive.backupNow()
-        assertTrue(!targetNode.preferences.backupSettings.first().remotePending)
+        assertEquals(null, targetDrive.backupNow().merged)
 
         // Un tercer teléfono que restaura ve los dos códigos con sus archivos.
         val third = TestNode(context)
@@ -430,8 +468,8 @@ class BackupTest {
             async(Dispatchers.IO) { sourceDrive.backupNow() },
         ).awaitAll()
 
-        assertEquals(1, remote.maxConcurrentUploads.get())
-        // Quedó un solo manifest y los 3 archivos.
+        // Ningún archivo se subió dos veces; quedó un solo manifest y los 3 archivos.
+        assertEquals(3, remote.uploadOrder.count { it.startsWith("media/") })
         assertEquals(1, remote.names().count { it == BackupManifest.MANIFEST_FILE_NAME })
         assertEquals(3, remote.names().count { it.startsWith("media/") })
     }
@@ -483,6 +521,9 @@ class BackupTest {
         private var counter = 0
         val uploadOrder = mutableListOf<String>()
         var failOnUploadName: String? = null
+
+        /** Falla toda subida a partir de que ya haya esta cantidad de subidas hechas. */
+        @Volatile var failAfterUploads: Int? = null
         var uploadDelayMs = 0L
         private val activeUploads = AtomicInteger(0)
         val maxConcurrentUploads = AtomicInteger(0)
@@ -501,6 +542,11 @@ class BackupTest {
         ): RemoteDriveFile {
             if (failOnUploadName == name) {
                 throw BackupException.NetworkError("Simulated network failure on $name")
+            }
+            failAfterUploads?.let { limit ->
+                if (synchronized(entries) { uploadOrder.size } >= limit) {
+                    throw BackupException.NetworkError("Simulated network failure after $limit uploads")
+                }
             }
             val active = activeUploads.incrementAndGet()
             maxConcurrentUploads.updateAndGet { maxOf(it, active) }

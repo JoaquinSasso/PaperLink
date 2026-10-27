@@ -17,8 +17,8 @@ import com.joasasso.paperlink.data.backup.BackupException
 import com.joasasso.paperlink.data.backup.BackupProgress
 import com.joasasso.paperlink.data.backup.DriveAuthManager
 import com.joasasso.paperlink.data.backup.DriveBackupManager
+import com.joasasso.paperlink.data.backup.DriveSync
 import com.joasasso.paperlink.data.backup.MergeCounts
-import com.joasasso.paperlink.data.backup.RemoteBackupInfo
 import com.joasasso.paperlink.data.backup.ZipBackupManager
 import com.joasasso.paperlink.data.preferences.BackupSettings
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
@@ -37,9 +37,11 @@ import kotlinx.coroutines.launch
 
 /**
  * Pantalla de respaldo: exportación/importación ZIP manual y respaldo incremental en Google Drive.
- * La acción de Drive que espera autorización (`KEY_PENDING_DRIVE_ACTION`) se guarda en
- * [SavedStateHandle] para sobrevivir a la recreación de la actividad o muerte del proceso
- * mientras está abierta la pantalla de consentimiento de Google.
+ * Respaldar y restaurar con Drive corren en segundo plano ([DriveSync]): la pantalla solo pide la
+ * autorización de Google, encola el trabajo y muestra su avance.
+ * La acción de Drive que espera autorización (`KEY_PENDING_DRIVE_ACTION`) y la ejecución cuyo
+ * resultado falta mostrar (`KEY_WATCHED_RUN`) se guardan en [SavedStateHandle] para sobrevivir a
+ * la recreación de la actividad o a la muerte del proceso.
  */
 class BackupViewModel(
     private val handle: SavedStateHandle,
@@ -47,14 +49,12 @@ class BackupViewModel(
     private val zipBackupManager: ZipBackupManager,
     private val driveAuthManager: DriveAuthManager,
     private val driveBackupManager: DriveBackupManager,
+    private val driveSync: DriveSync,
 ) : ViewModel() {
 
     enum class OperationKind(@param:StringRes val titleRes: Int) {
         EXPORT_ZIP(R.string.backup_progress_exporting),
         IMPORT_ZIP(R.string.backup_progress_importing),
-        DRIVE_CHECKING(R.string.backup_progress_checking),
-        DRIVE_BACKUP(R.string.backup_progress_uploading),
-        DRIVE_RESTORE(R.string.backup_progress_restoring),
     }
 
     private enum class PendingDriveAction {
@@ -71,11 +71,12 @@ class BackupViewModel(
     sealed interface UiMessage {
         data class Res(@param:StringRes val resId: Int) : UiMessage
         data class Restored(val addedLinks: Int, val addedAttachments: Int) : UiMessage
+        data class BackedUpWithMerge(val addedLinks: Int, val addedAttachments: Int) : UiMessage
+        data class Text(val text: String) : UiMessage
     }
 
     data class Events(
         val authResolution: PendingIntent? = null,
-        val foundRemoteBackup: RemoteBackupInfo? = null,
         val message: UiMessage? = null,
     )
 
@@ -88,7 +89,33 @@ class BackupViewModel(
     private val _events = MutableStateFlow(Events())
     val events: StateFlow<Events> = _events.asStateFlow()
 
+    /** Respaldo o restauración con Drive en curso (o el último). */
+    val driveRun: StateFlow<DriveSync.Run?> = driveSync.lastRun
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private var operationJob: Job? = null
+
+    init {
+        // El resultado se muestra solo para la ejecución que se lanzó desde esta pantalla.
+        viewModelScope.launch {
+            driveSync.lastRun.collect { run ->
+                if (run == null || run.id.toString() != handle.get<String>(KEY_WATCHED_RUN)) return@collect
+                val message = when (run) {
+                    is DriveSync.Run.Waiting, is DriveSync.Run.Running -> return@collect
+                    is DriveSync.Run.Succeeded -> when {
+                        run.mode == DriveSync.Mode.RESTORE -> restoreMessage(run.addedLinks, run.addedAttachments)
+                        run.addedLinks > 0 || run.addedAttachments > 0 ->
+                            UiMessage.BackedUpWithMerge(run.addedLinks, run.addedAttachments)
+                        else -> UiMessage.Res(R.string.backup_success_drive)
+                    }
+                    is DriveSync.Run.Failed -> run.message?.let { UiMessage.Text(it) } ?: UiMessage.Res(R.string.error_generic)
+                    is DriveSync.Run.Cancelled -> null
+                }
+                handle[KEY_WATCHED_RUN] = null
+                if (message != null) _events.update { it.copy(message = message) }
+            }
+        }
+    }
 
     fun exportZip(destinationUri: Uri) {
         runOperation(OperationKind.EXPORT_ZIP) { updateProgress ->
@@ -109,7 +136,7 @@ class BackupViewModel(
             viewModelScope.launch { driveBackupManager.disableDriveBackup() }
             return
         }
-        startConnectDrive()
+        startDrive(PendingDriveAction.CONNECT)
     }
 
     fun onToggleChargingOnly(chargingOnly: Boolean) {
@@ -118,23 +145,12 @@ class BackupViewModel(
         }
     }
 
-    fun backupToDriveNow() {
-        handle[KEY_PENDING_DRIVE_ACTION] = PendingDriveAction.BACKUP_NOW.name
-        runOperation(OperationKind.DRIVE_BACKUP) { updateProgress ->
-            driveBackupManager.backupNow(updateProgress)
-            handle[KEY_PENDING_DRIVE_ACTION] = null
-            _events.update { it.copy(message = UiMessage.Res(R.string.backup_success_drive)) }
-        }
-    }
+    /** Respalda en Drive; si Drive tiene un respaldo que este teléfono no tiene, primero lo une. */
+    fun backupToDriveNow() = startDrive(PendingDriveAction.BACKUP_NOW)
 
-    fun restoreFromDriveNow() {
-        handle[KEY_PENDING_DRIVE_ACTION] = PendingDriveAction.RESTORE.name
-        runOperation(OperationKind.DRIVE_RESTORE) { updateProgress ->
-            val counts = driveBackupManager.restoreFromDrive(updateProgress)
-            handle[KEY_PENDING_DRIVE_ACTION] = null
-            emitRestoreMessage(counts)
-        }
-    }
+    fun restoreFromDriveNow() = startDrive(PendingDriveAction.RESTORE)
+
+    fun cancelDriveRun() = driveSync.cancel()
 
     fun onAuthResult(resultOk: Boolean, data: Intent?) {
         val pendingName = handle.get<String>(KEY_PENDING_DRIVE_ACTION)
@@ -149,42 +165,11 @@ class BackupViewModel(
         try {
             // Guarda el token en el administrador de autorización para las llamadas siguientes.
             driveAuthManager.getTokenFromIntent(data)
-            when (action) {
-                PendingDriveAction.CONNECT -> completeConnectDrive()
-                PendingDriveAction.BACKUP_NOW -> backupToDriveNow()
-                PendingDriveAction.RESTORE -> restoreFromDriveNow()
-            }
+            startDrive(action)
         } catch (e: Exception) {
             log("Failed to process Drive authorization result", e)
             _events.update { it.copy(message = UiMessage.Res(e.messageRes())) }
         }
-    }
-
-    /**
-     * Restaura (fusiona) el respaldo encontrado en Drive, activa el respaldo automático y sube
-     * lo que este teléfono tenga de más. Nada se pisa: la fusión solo agrega.
-     */
-    fun confirmRestoreRemoteBackup() {
-        _events.update { it.copy(foundRemoteBackup = null) }
-        handle[KEY_PENDING_DRIVE_ACTION] = PendingDriveAction.RESTORE.name
-        runOperation(OperationKind.DRIVE_RESTORE) { updateProgress ->
-            val counts = driveBackupManager.restoreFromDrive(updateProgress)
-            handle[KEY_PENDING_DRIVE_ACTION] = null
-            driveBackupManager.enableDriveBackup()
-            _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP)
-            driveBackupManager.backupNow { progress ->
-                _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP, progress)
-            }
-            emitRestoreMessage(counts)
-        }
-    }
-
-    /**
-     * "Ahora no": no se toca Drive. Respaldar ahora achicaría el respaldo remoto, así que el
-     * respaldo automático no se activa hasta que el usuario lo restaure.
-     */
-    fun dismissRemoteBackupPrompt() {
-        _events.update { it.copy(foundRemoteBackup = null, message = UiMessage.Res(R.string.backup_remote_skipped)) }
     }
 
     fun cancelOperation() {
@@ -194,42 +179,48 @@ class BackupViewModel(
     fun onAuthResolutionLaunched() = _events.update { it.copy(authResolution = null) }
     fun onMessageShown() = _events.update { it.copy(message = null) }
 
-    private fun startConnectDrive() {
-        handle[KEY_PENDING_DRIVE_ACTION] = PendingDriveAction.CONNECT.name
-        runOperation(OperationKind.DRIVE_CHECKING) { connectDrive() }
-    }
-
-    private fun completeConnectDrive() {
-        runOperation(OperationKind.DRIVE_CHECKING) { connectDrive() }
-    }
-
     /**
-     * Antes de activar nada se mira Drive: si tiene un respaldo que este teléfono no fusionó, se
-     * ofrece restaurarlo y el respaldo automático queda apagado hasta entonces.
+     * Pide la autorización de Google si hace falta (acá, con la pantalla abierta) y encola el
+     * trabajo en segundo plano. Activar el respaldo automático también respalda en el momento.
      */
-    private suspend fun connectDrive() {
-        val state = driveBackupManager.checkRemoteState()
-        handle[KEY_PENDING_DRIVE_ACTION] = null
-        if (state is DriveBackupManager.RemoteState.NeedsMerge) {
-            _events.update { it.copy(foundRemoteBackup = state.info) }
-            return
+    private fun startDrive(action: PendingDriveAction) {
+        val current = driveRun.value
+        if (current is DriveSync.Run.Waiting || current is DriveSync.Run.Running) return
+        handle[KEY_PENDING_DRIVE_ACTION] = action.name
+        viewModelScope.launch {
+            try {
+                driveBackupManager.ensureAuthorized()
+                handle[KEY_PENDING_DRIVE_ACTION] = null
+                if (action == PendingDriveAction.CONNECT) driveBackupManager.enableDriveBackup()
+                val mode = if (action == PendingDriveAction.RESTORE) DriveSync.Mode.RESTORE else DriveSync.Mode.BACKUP
+                handle[KEY_WATCHED_RUN] = driveSync.start(mode).toString()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BackupException.AuthRequired) {
+                if (e.resolution != null) {
+                    _events.update { it.copy(authResolution = e.resolution) }
+                } else {
+                    log("Drive auth failed without resolution", e)
+                    _events.update { it.copy(message = UiMessage.Res(e.messageRes())) }
+                }
+            } catch (e: Exception) {
+                log("Could not start Drive $action", e)
+                handle[KEY_PENDING_DRIVE_ACTION] = null
+                _events.update { it.copy(message = UiMessage.Res(e.messageRes())) }
+            }
         }
-        driveBackupManager.enableDriveBackup()
-        _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP)
-        driveBackupManager.backupNow { progress ->
-            _activeOperation.value = ActiveOperation(OperationKind.DRIVE_BACKUP, progress)
-        }
-        _events.update { it.copy(message = UiMessage.Res(R.string.backup_success_drive)) }
     }
 
     private fun emitRestoreMessage(counts: MergeCounts) {
-        val msg = if (counts.addedLinks == 0 && counts.addedAttachments == 0) {
+        _events.update { it.copy(message = restoreMessage(counts.addedLinks, counts.addedAttachments)) }
+    }
+
+    private fun restoreMessage(addedLinks: Int, addedAttachments: Int): UiMessage =
+        if (addedLinks == 0 && addedAttachments == 0) {
             UiMessage.Res(R.string.backup_success_restore_up_to_date)
         } else {
-            UiMessage.Restored(counts.addedLinks, counts.addedAttachments)
+            UiMessage.Restored(addedLinks, addedAttachments)
         }
-        _events.update { it.copy(message = msg) }
-    }
 
     private fun runOperation(
         kind: OperationKind,
@@ -244,16 +235,6 @@ class BackupViewModel(
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: BackupException.RemoteNotMerged) {
-                // Drive tiene contenido que este teléfono no tiene: se ofrece restaurarlo.
-                _events.update { it.copy(foundRemoteBackup = e.info) }
-            } catch (e: BackupException.AuthRequired) {
-                if (e.resolution != null) {
-                    _events.update { it.copy(authResolution = e.resolution) }
-                } else {
-                    log("Drive auth failed without resolution", e)
-                    _events.update { it.copy(message = UiMessage.Res(e.messageRes())) }
-                }
             } catch (e: Exception) {
                 log("Backup operation $kind failed", e)
                 _events.update { it.copy(message = UiMessage.Res(e.messageRes())) }
@@ -265,6 +246,7 @@ class BackupViewModel(
 
     companion object {
         private const val KEY_PENDING_DRIVE_ACTION = "pending_drive_action"
+        private const val KEY_WATCHED_RUN = "watched_drive_run"
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -275,6 +257,7 @@ class BackupViewModel(
                     zipBackupManager = app.container.zipBackupManager,
                     driveAuthManager = app.container.driveAuthManager,
                     driveBackupManager = app.container.driveBackupManager,
+                    driveSync = app.container.driveSync,
                 )
             }
         }

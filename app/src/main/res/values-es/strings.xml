@@ -209,10 +209,6 @@
     <string name="backup_success_drive">Respaldo en Google Drive completado.</string>
     <string name="backup_success_restore_up_to_date">Ya estaba todo al día.</string>
     <string name="backup_success_restore_counts">Restaurado: %1$d códigos nuevos y %2$d elementos nuevos.</string>
-    <string name="backup_found_dialog_title">Respaldo encontrado en Google Drive</string>
-    <string name="backup_found_dialog_message">Hay un respaldo del %1$s con %2$d códigos (%3$s). ¿Querés restaurarlo ahora?</string>
-    <string name="backup_found_dialog_restore">Restaurar</string>
-    <string name="backup_found_dialog_skip">Ahora no</string>
     <string name="home_restore_backup">Restaurar respaldo</string>
     <string name="home_backup_suggest_title">Respaldá tus códigos</string>
     <string name="home_backup_suggest_body">Activá el respaldo en Google Drive o exportá un ZIP para no perder tus códigos si desinstalás la app o cambiás de teléfono.</string>
@@ -227,9 +223,6 @@
     <string name="error_backup_network">No se pudo conectar con Google Drive. Revisá tu conexión y volvé a intentar.</string>
 
     <!-- Respaldo: protección del respaldo de Drive -->
-    <string name="error_backup_remote_not_merged">Google Drive tiene un respaldo que todavía no está en este teléfono. Restauralo primero para no perder nada.</string>
-    <string name="backup_remote_skipped">No se respaldó nada, así que el respaldo de Google Drive queda como está. El respaldo automático se activa cuando lo restaures.</string>
-    <string name="home_backup_remote_pending_warning">Google Drive tiene un respaldo que no está en este teléfono. El respaldo automático está en pausa hasta que lo restaures. Tocá para abrir.</string>
 
     <!-- Cargas en segundo plano -->
     <string name="action_ok">Entendido</string>
@@ -239,4 +232,12 @@
     <string name="import_bg_failed_code">%1$s: no se pudieron guardar %2$d de %3$d elementos.</string>
     <string name="import_bg_all_failed">No se pudo guardar ninguno de los %2$d elementos en %1$s. El código existe: volvé a agregarlos con «Agregar más».</string>
     <string name="import_bg_interrupted">Se cortó la carga en %1$s: se guardaron %2$d de %3$d elementos. Agregá los que faltan desde el código.</string>
+    <string name="drive_sync_channel">Respaldo en Google Drive</string>
+    <string name="drive_sync_merging">Uniendo el respaldo de Google Drive…</string>
+    <string name="drive_sync_waiting">Esperando conexión para respaldar…</string>
+    <string name="drive_sync_backup_failed">No se pudo respaldar en Google Drive</string>
+    <string name="drive_sync_restore_failed">No se pudo restaurar desde Google Drive</string>
+    <string name="drive_sync_restore_done">Restauración desde Google Drive completa</string>
+    <string name="drive_sync_background_hint">Podés salir de la app: sigue en segundo plano.</string>
+    <string name="backup_success_drive_merged">Respaldo completo. Se sumaron a este teléfono %1$d códigos y %2$d elementos de Google Drive.</string>
 </resources>

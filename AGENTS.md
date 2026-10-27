@@ -80,6 +80,8 @@ adb logcat -s PaperLink
 - Códigos de prueba (solo debug, etiqueta `[seed]`; UNSEED borra solo esos):
   `adb shell am broadcast -a com.joasasso.paperlink.debug.SEED --ei count 200 -p com.joasasso.paperlink.debug`
   `adb shell am broadcast -a com.joasasso.paperlink.debug.UNSEED -p com.joasasso.paperlink.debug`
+- Medir subidas a Drive (solo debug, sube archivos `bench-*` a `appDataFolder` y los borra; resultados `DriveBench:` en logcat). Necesita Drive conectado y **la app en primer plano con la pantalla prendida**: en segundo plano Android congela el proceso y corta la red.
+  `adb shell am broadcast -a com.joasasso.paperlink.debug.DRIVE_BENCH --ei count 20 --ei sizeKb 300 -p com.joasasso.paperlink.debug`
 - Muerte del proceso: mandá la app a segundo plano (`input keyevent KEYCODE_HOME`), `am kill` o `run-as com.joasasso.paperlink.debug kill -9 <pid>`, y reabrí desde el launcher.
 - `adb shell input text` inyecta teclas más rápido que una persona y Gboard pierde caracteres: para probar el campo de código, enviá de a una tecla con ~150 ms de pausa.
 - Los logs de debug `Lookup started` / `Viewer shown` sirven para medir la apertura por código.

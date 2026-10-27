@@ -10,6 +10,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -111,9 +112,8 @@ class DriveAppDataClient(
     }
 
     /**
-     * Subida reanudable (`uploadType=resumable`): sirve para archivos de cualquier tamaño (la
-     * multipart está pensada para hasta 5 MB). Primero se abre la sesión con los metadatos y
-     * después se envía el contenido en un solo PUT. Si se corta, el próximo respaldo lo reintenta.
+     * Archivos de hasta [MULTIPART_MAX_BYTES] van en un solo pedido (`multipart`); los más grandes
+     * (videos) usan la subida reanudable, pensada para archivos de cualquier tamaño.
      */
     override suspend fun uploadStream(
         accessToken: String,
@@ -122,6 +122,51 @@ class DriveAppDataClient(
         contentLength: Long,
         contentStream: InputStream,
     ): RemoteDriveFile = withContext(ioDispatcher) {
+        if (contentLength <= MULTIPART_MAX_BYTES) {
+            uploadMultipart(accessToken, name, mimeType, contentLength, contentStream)
+        } else {
+            uploadResumable(accessToken, name, mimeType, contentLength, contentStream)
+        }
+    }
+
+    /** Subida `multipart`: metadatos y contenido en un solo pedido (bloqueante). */
+    fun uploadMultipart(
+        accessToken: String,
+        name: String,
+        mimeType: String,
+        contentLength: Long,
+        contentStream: InputStream,
+    ): RemoteDriveFile {
+        val metadataJson = json.encodeToString(CreateFileMetadata(name = name))
+        val url = UPLOAD_ENDPOINT.toHttpUrl().newBuilder()
+            .addQueryParameter("uploadType", "multipart")
+            .addQueryParameter("fields", "id,name,size")
+            .build()
+        val body = MultipartBody.Builder()
+            .setType("multipart/related".toMediaType())
+            .addPart(metadataJson.toRequestBody("application/json; charset=UTF-8".toMediaType()))
+            .addPart(streamBody(mimeType, contentLength, contentStream))
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $accessToken")
+            .post(body)
+            .build()
+        return executeRequest(request) { response -> parseUploaded(response, name) }
+    }
+
+    /**
+     * Subida reanudable (`uploadType=resumable`): primero se abre la sesión con los metadatos y
+     * después se envía el contenido en un solo PUT (bloqueante). Si se corta, el próximo respaldo
+     * lo reintenta.
+     */
+    fun uploadResumable(
+        accessToken: String,
+        name: String,
+        mimeType: String,
+        contentLength: Long,
+        contentStream: InputStream,
+    ): RemoteDriveFile {
         val metadataJson = json.encodeToString(CreateFileMetadata(name = name))
         val startUrl = UPLOAD_ENDPOINT.toHttpUrl().newBuilder()
             .addQueryParameter("uploadType", "resumable")
@@ -137,32 +182,33 @@ class DriveAppDataClient(
         val sessionUrl = executeRequest(start) { response ->
             response.header("Location") ?: throw BackupException.NetworkError("Drive did not return an upload session")
         }
-
-        val content = object : RequestBody() {
-            override fun contentType() = mimeType.toMediaType()
-            override fun contentLength() = contentLength
-            override fun isOneShot(): Boolean = true
-
-            override fun writeTo(sink: BufferedSink) {
-                val buffer = ByteArray(BUFFER_SIZE)
-                while (true) {
-                    val read = contentStream.read(buffer)
-                    if (read < 0) break
-                    sink.write(buffer, 0, read)
-                }
-            }
-        }
         val upload = Request.Builder()
             .url(sessionUrl)
             .header("Authorization", "Bearer $accessToken")
-            .put(content)
+            .put(streamBody(mimeType, contentLength, contentStream))
             .build()
+        return executeRequest(upload) { response -> parseUploaded(response, name) }
+    }
 
-        executeRequest(upload) { response ->
-            val body = response.body?.string()
-                ?: throw BackupException.NetworkError("Empty response uploading $name")
-            json.decodeFromString<RemoteDriveFile>(body)
+    private fun streamBody(mimeType: String, contentLength: Long, contentStream: InputStream) = object : RequestBody() {
+        override fun contentType() = mimeType.toMediaType()
+        override fun contentLength() = contentLength
+        override fun isOneShot(): Boolean = true
+
+        override fun writeTo(sink: BufferedSink) {
+            val buffer = ByteArray(BUFFER_SIZE)
+            while (true) {
+                val read = contentStream.read(buffer)
+                if (read < 0) break
+                sink.write(buffer, 0, read)
+            }
         }
+    }
+
+    private fun parseUploaded(response: Response, name: String): RemoteDriveFile {
+        val body = response.body?.string()
+            ?: throw BackupException.NetworkError("Empty response uploading $name")
+        return json.decodeFromString<RemoteDriveFile>(body)
     }
 
     override suspend fun downloadFile(
@@ -234,6 +280,7 @@ class DriveAppDataClient(
         private const val FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"
         private const val UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/drive/v3/files"
         private const val BUFFER_SIZE = 64 * 1024
+        const val MULTIPART_MAX_BYTES = 5L * 1024 * 1024
 
         fun defaultOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)

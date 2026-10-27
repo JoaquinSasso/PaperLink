@@ -1,6 +1,9 @@
 package com.joasasso.paperlink.ui.screens.backup
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,17 +42,21 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.joasasso.paperlink.R
-import com.joasasso.paperlink.data.backup.RemoteBackupInfo
+import com.joasasso.paperlink.data.backup.DriveSync
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +69,8 @@ fun BackupScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val activeOperation by viewModel.activeOperation.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
+    val driveRun by viewModel.driveRun.collectAsStateWithLifecycle()
+    val driveBusy = driveRun is DriveSync.Run.Waiting || driveRun is DriveSync.Run.Running
     val snackbar = remember { SnackbarHostState() }
 
     val createZipLauncher = rememberLauncherForActivityResult(
@@ -82,6 +91,34 @@ fun BackupScreen(
         viewModel.onAuthResult(result.resultCode == Activity.RESULT_OK, result.data)
     }
 
+    // La notificación de progreso necesita permiso (Android 13+). Se pide al lanzar una acción de
+    // Drive y la acción sigue igual aunque se niegue. La acción pendiente sobrevive a la recreación.
+    var pendingDriveAction by rememberSaveable { mutableStateOf<String?>(null) }
+    fun runDriveAction(name: String) {
+        when (name) {
+            ACTION_CONNECT -> viewModel.onToggleAutoBackup(true)
+            ACTION_BACKUP -> viewModel.backupToDriveNow()
+            ACTION_RESTORE -> viewModel.restoreFromDriveNow()
+        }
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        pendingDriveAction?.let { runDriveAction(it) }
+        pendingDriveAction = null
+    }
+    fun onDriveAction(name: String) {
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        if (needsPermission) {
+            pendingDriveAction = name
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            runDriveAction(name)
+        }
+    }
+
     LaunchedEffect(events.authResolution) {
         val pendingIntent = events.authResolution ?: return@LaunchedEffect
         viewModel.onAuthResolutionLaunched()
@@ -95,6 +132,12 @@ fun BackupScreen(
             msg.addedLinks,
             msg.addedAttachments,
         )
+        is BackupViewModel.UiMessage.BackedUpWithMerge -> stringResource(
+            R.string.backup_success_drive_merged,
+            msg.addedLinks,
+            msg.addedAttachments,
+        )
+        is BackupViewModel.UiMessage.Text -> msg.text
         null -> null
     }
     LaunchedEffect(messageText) {
@@ -133,13 +176,13 @@ fun BackupScreen(
                 WarningCard(
                     text = stringResource(R.string.home_backup_reauth_warning),
                     actionLabel = stringResource(R.string.backup_drive_reauthorize),
-                    onAction = viewModel::backupToDriveNow,
+                    onAction = { onDriveAction(ACTION_BACKUP) },
                 )
             } else if (settings.isStale(now)) {
                 WarningCard(
                     text = stringResource(R.string.home_backup_stale_warning),
                     actionLabel = stringResource(R.string.backup_drive_now),
-                    onAction = viewModel::backupToDriveNow,
+                    onAction = { onDriveAction(ACTION_BACKUP) },
                 )
             }
 
@@ -191,7 +234,10 @@ fun BackupScreen(
                         )
                         Switch(
                             checked = settings.driveEnabled,
-                            onCheckedChange = viewModel::onToggleAutoBackup,
+                            onCheckedChange = { enabled ->
+                                if (enabled) onDriveAction(ACTION_CONNECT) else viewModel.onToggleAutoBackup(false)
+                            },
+                            enabled = !driveBusy,
                         )
                     }
 
@@ -214,14 +260,20 @@ fun BackupScreen(
                     }
 
                     Spacer(Modifier.height(4.dp))
+                    val run = driveRun
+                    if (driveBusy && run != null) {
+                        DriveRunStatus(run = run, onCancel = viewModel::cancelDriveRun)
+                    }
                     Button(
-                        onClick = viewModel::backupToDriveNow,
+                        onClick = { onDriveAction(ACTION_BACKUP) },
+                        enabled = !driveBusy,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.backup_drive_now))
                     }
                     OutlinedButton(
-                        onClick = viewModel::restoreFromDriveNow,
+                        onClick = { onDriveAction(ACTION_RESTORE) },
+                        enabled = !driveBusy,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.backup_drive_restore))
@@ -270,14 +322,6 @@ fun BackupScreen(
                 }
             }
         }
-    }
-
-    events.foundRemoteBackup?.let { info ->
-        RemoteBackupFoundDialog(
-            info = info,
-            onRestore = viewModel::confirmRestoreRemoteBackup,
-            onDismiss = viewModel::dismissRemoteBackupPrompt,
-        )
     }
 
     activeOperation?.let { op ->
@@ -329,43 +373,51 @@ private fun WarningCard(
     }
 }
 
+/** Avance del respaldo o la restauración con Drive, que corre en segundo plano. */
 @Composable
-private fun RemoteBackupFoundDialog(
-    info: RemoteBackupInfo,
-    onRestore: () -> Unit,
-    onDismiss: () -> Unit,
+private fun DriveRunStatus(
+    run: DriveSync.Run,
+    onCancel: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val dateText = DateUtils.formatDateTime(
-        context,
-        info.createdAt,
-        DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH,
-    )
-    val sizeText = Formatter.formatShortFileSize(context, info.totalSizeBytes)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.backup_found_dialog_title)) },
-        text = {
+    val progress = (run as? DriveSync.Run.Running)?.progress
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val title = if (run is DriveSync.Run.Waiting) {
+            R.string.drive_sync_waiting
+        } else {
+            DriveSync.titleRes(run.mode, progress)
+        }
+        Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
+        if (progress != null && progress.totalFiles > 0) {
             Text(
                 stringResource(
-                    R.string.backup_found_dialog_message,
-                    dateText,
-                    info.linkCount,
-                    sizeText,
-                )
+                    R.string.import_progress_file,
+                    progress.currentFiles.coerceAtMost(progress.totalFiles),
+                    progress.totalFiles,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
             )
-        },
-        confirmButton = {
-            TextButton(onClick = onRestore) {
-                Text(stringResource(R.string.backup_found_dialog_restore))
+            LinearProgressIndicator(
+                progress = { (progress.currentFiles.toFloat() / progress.totalFiles).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.drive_sync_background_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.action_cancel))
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.backup_found_dialog_skip))
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -405,3 +457,7 @@ private fun BackupProgressDialog(
         },
     )
 }
+
+private const val ACTION_CONNECT = "connect"
+private const val ACTION_BACKUP = "backup"
+private const val ACTION_RESTORE = "restore"
