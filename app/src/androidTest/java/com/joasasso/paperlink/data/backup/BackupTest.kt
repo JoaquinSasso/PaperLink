@@ -11,6 +11,7 @@ import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import com.joasasso.paperlink.data.repository.AttachmentSource
+import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.sha256
 import com.joasasso.paperlink.ui.screens.home.HomeViewModel
@@ -285,6 +286,7 @@ class BackupTest {
             HomeViewModel(
                 handle = SavedStateHandle(),
                 repository = sourceNode.repository,
+                batchImporter = BatchImporter(sourceNode.repository, sourceNode.store, sourceNode.preferences, sourceNode.scope, 3),
                 preferences = sourceNode.preferences,
             )
         }

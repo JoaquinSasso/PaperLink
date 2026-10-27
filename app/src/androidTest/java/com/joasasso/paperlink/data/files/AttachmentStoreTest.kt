@@ -96,6 +96,24 @@ class AttachmentStoreTest {
     }
 
     @Test
+    fun largeRotatedImage_isScaledAndRotatedKeepingAspect() = runBlocking {
+        // Como una foto de cámara: más grande que el máximo y con rotación EXIF.
+        val source = dir.image("camera.jpg", 4000, 2000, Bitmap.CompressFormat.JPEG)
+        ExifInterface(source).apply {
+            setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_ROTATE_90.toString())
+            saveAttributes()
+        }
+
+        val result = store.import(Uri.fromFile(source))
+
+        val bitmap = BitmapFactory.decodeFile(stored(result).path)
+        assertEquals(AttachmentStore.IMAGE_MAX_SIDE_PX / 2, bitmap.width)
+        assertEquals(AttachmentStore.IMAGE_MAX_SIDE_PX, bitmap.height)
+        assertColorNear(Color.RED, bitmap.getPixel(bitmap.width / 2, bitmap.height / 8))
+        assertColorNear(Color.BLUE, bitmap.getPixel(bitmap.width / 2, bitmap.height * 7 / 8))
+    }
+
+    @Test
     fun transparentImage_isFlattenedOnWhite() = runBlocking {
         val source = dir.image("alpha.png", 200, 100, Bitmap.CompressFormat.PNG, alpha = true)
 

@@ -1,13 +1,16 @@
 package com.joasasso.paperlink.ui.screens.home
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.joasasso.paperlink.TestDir
 import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
+import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import com.joasasso.paperlink.data.repository.AttachmentSource
+import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +27,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 /** Apertura instantánea al cuarto carácter y sugerencias cuando el código no existe. */
 @RunWith(AndroidJUnit4::class)
@@ -50,7 +54,13 @@ class HomeViewModelTest {
         dir.delete()
     }
 
-    private suspend fun viewModel() = withContext(Dispatchers.Main) { HomeViewModel(SavedStateHandle(), repository) }
+    private suspend fun viewModel() = withContext(Dispatchers.Main) {
+        val store = AttachmentStore(context, dir.base)
+        val preferences = UserPreferencesRepository(
+            PreferenceDataStoreFactory.create(scope = scope) { File(dir.root, "prefs.preferences_pb") }
+        )
+        HomeViewModel(SavedStateHandle(), repository, BatchImporter(repository, store, preferences, scope, 3))
+    }
 
     private suspend fun HomeViewModel.type(text: String) = withContext(Dispatchers.Main) { onCodeChange(text) }
 
