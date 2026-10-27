@@ -7,14 +7,12 @@ Origen: auditoría del 23/10/2026. Este documento es la especificación de traba
 Actualizado: 26/10/2026.
 
 - **Hechas:** fases 0 a 3. **Fase 4 implementada** (hecha con Antigravity y revisada/corregida con Claude Code), todavía sin cerrar. Todo commiteado en `master`, sin push. Base de datos en versión 4.
-- **Para cerrar la Fase 4:**
-  1. Correr los instrumentados con el teléfono conectado (los 6 tests nuevos de `BackupTest` todavía no corrieron en dispositivo).
-  2. Probar el criterio en el teléfono: respaldar en Drive, desinstalar, reinstalar, restaurar y ver todos los códigos con sus archivos. Probar también "Ahora no" en el aviso de respaldo encontrado (no debe tocar Drive).
-  3. Dejar en el repo (por ejemplo `docs/GOOGLE_CLOUD.md`) las instrucciones de configuración de Google Cloud que pedía el plan: no están.
-  4. Marcar el checklist y la verificación.
+- **Para cerrar la Fase 4 (lo demás ya está verificado):**
+  1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual: Drive no debe cambiar y la Home debe avisar que el respaldo automático está en pausa.
+  2. Dejar en el repo (por ejemplo `docs/GOOGLE_CLOUD.md`) las instrucciones de configuración de Google Cloud que pedía el plan: no están.
 - **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
 - **Siguiente después:** Fase 5 (pulido y publicación).
-- **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4, pendientes de la prueba en dispositivo.
+- **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4 y cubiertas por tests; la restauración completa se probó en el teléfono.
 - **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (el usuario no tenía archivos así), dispositivo de gama baja y build de release con R8 → Fase 5.
 - **Herramientas:** el trabajo de las fases 0 a 3 se hizo con Claude Code; desde acá se puede seguir con Antigravity (`AGENTS.md`, `.agents/rules/`, `.agents/workflows/`: `/fase`, `/probar`, `/retomar`) o con Claude Code (`CLAUDE.md` importa `AGENTS.md`).
 
@@ -225,13 +223,16 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
   - Herramienta de prueba solo en debug: `SeedReceiver` (`app/src/debug/`), carga/borra códigos con etiqueta `[seed]`.
 
 ### Fase 4 — Respaldo
-- [ ] Exportar e importar ZIP.
-- [ ] Confirmar `drive.appdata` vs `drive.file` (sección 7).
+- [x] Exportar e importar ZIP.
+- [x] Confirmar `drive.appdata` vs `drive.file` (sección 7).
 - [ ] Instrucciones para que el usuario configure Google Cloud (consentimiento, client IDs, SHA-1).
-- [ ] Autorización, subida incremental, restauración, pantalla de ajustes de respaldo.
-- [ ] `data_extraction_rules.xml`.
+- [x] Autorización, subida incremental, restauración, pantalla de ajustes de respaldo.
+- [x] `data_extraction_rules.xml`.
 - **Criterio (en dispositivo):** respaldar, desinstalar, reinstalar, restaurar y ver todos los vínculos con sus archivos.
-- **Estado (26/10/2026):** implementado; falta la verificación en dispositivo y las instrucciones de Google Cloud en el repo (ver "Estado actual"). Unit tests en verde; instrumentados compilan pero no corrieron con los últimos cambios.
+- **Verificación:**
+  - **Criterio cumplido (26/10/2026, Pixel 8, probado por el usuario):** respaldar en Drive, desinstalar, reinstalar, restaurar y ver todos los códigos con sus archivos. Se probó con la versión anterior a la corrección de seguridad del respaldo; esa corrección no cambió la restauración (solo agrega que, al terminar, se guarda el id del manifest fusionado).
+  - Después de la corrección (27/10/2026): 42 unit tests y 65 instrumentados en verde en el Pixel 8 (incluidos los 6 nuevos de `BackupTest`); la app abre sin errores en logcat.
+  - Pendiente: "Ahora no" en el aviso de respaldo encontrado y las instrucciones de Google Cloud en el repo (ver "Estado actual").
 - **Notas y decisiones:**
   - Decisión pendiente resuelta: **`drive.appdata`** (carpeta oculta de la app, scope no sensible). Cliente REST de Drive v3 con OkHttp, autorización con `Identity.getAuthorizationClient()`.
   - ZIP: `manifest.json` (formato versión 1) + `media/`; al importar se valida el manifest y las rutas, se verifica el SHA-256 de cada archivo antes del rename atómico y se fusiona por id en una transacción (`LinkDao.mergeBackup`: solo agrega, conserva la etiqueta local).
