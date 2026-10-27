@@ -14,3 +14,4 @@ trigger: always_on
 - Ningún `catch` vacío; strings siempre en `values/` y `values-es/`; logs solo con `util/log()`.
 - No uses `connectedDebugAndroidTest` (desinstala la app y borra los datos del usuario): usá `installDebug installDebugAndroidTest` + `adb shell am instrument`.
 - Preguntá antes de borrar datos del usuario, agregar dependencias pesadas o cambiar una decisión pendiente. Los ajustes del sistema del teléfono los hace el usuario.
+- Si un trabajo de corrección, refactorización u optimización pasó por problema → pruebas para elegir solución → implementación comprobada, documentalo como informe en `docs/informes/` (ver `docs/informes/README.md`).

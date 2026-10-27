@@ -13,6 +13,19 @@ App Android que vincula un **código corto de 4 caracteres** (escrito a mano en 
 - No cambies configuraciones del sistema del teléfono (TalkBack, "No conservar actividades", permisos del sistema): pedile al usuario que lo haga.
 - Al terminar una fase: compilá, corré unit e instrumentados, probá en el teléfono, marcá el checklist en `docs/PLAN.md`, anotá decisiones (en la fase y en el "Registro de decisiones") y actualizá "Estado actual".
 
+## Documentar investigaciones (informes)
+
+Todo trabajo de **corrección, refactorización u optimización** que siga este camino se documenta en `docs/informes/`:
+
+1. Se encuentra un problema (lo reporta el usuario, aparece en una prueba o en una revisión).
+2. Se hacen pruebas o mediciones para elegir la mejor solución.
+3. Se implementa la solución y se comprueba.
+
+- Un archivo por tema: `docs/informes/AAAA-MM-DD-tema-corto.md`, con narrativa de postmortem: resumen con tabla antes/después, línea de tiempo, hipótesis con sus mediciones (**también las descartadas**), decisión, bugs encontrados en el camino, verificación, qué salió bien y qué se puede mejorar, pendientes. La estructura completa y el índice están en `docs/informes/README.md`.
+- Agregalo al índice de `docs/informes/README.md` y enlazalo desde `docs/PLAN.md` (sección del tema y "Registro de decisiones").
+- Escribilo al cerrar el trabajo, con los números reales (tiempos, tamaños, cantidad de tests y repeticiones), y commitealo con prefijo `Docs:`.
+- No hace falta para cambios directos sin investigación (una corrección obvia, un texto, un ajuste visual).
+
 ## Stack
 
 - Kotlin 2.4, Jetpack Compose + Material 3, Navigation Compose con rutas tipadas (kotlinx.serialization)

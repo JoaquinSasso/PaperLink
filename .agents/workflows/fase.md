@@ -11,3 +11,4 @@ description: Ejecutar la siguiente fase del plan de PaperLink (o la que se indiq
 7. Repasá las garantías de confiabilidad de la fase (sección 8 del plan). Si alguna no se cumple, la fase no está terminada.
 8. Pedile al usuario las pruebas que requieren sus manos o ajustes del sistema, con pasos concretos.
 9. Al cerrar: marcá el checklist, agregá "Verificación" y "Notas y decisiones" en la fase, sumá filas al "Registro de decisiones", actualizá "Estado actual" y hacé el commit final.
+10. Si durante la fase hubo una investigación (problema → pruebas para elegir solución → implementación comprobada), escribí su informe en `docs/informes/` según `docs/informes/README.md`.

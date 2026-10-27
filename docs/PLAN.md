@@ -1,6 +1,6 @@
 # PaperLink — Plan de reescritura
 
-Origen: auditoría del 23/10/2026. Este documento es la especificación de trabajo; mantenerlo actualizado (checklists, decisiones y "Estado actual") al cerrar cada fase. La guía para agentes (invariantes, comandos, mapa del código, forma de trabajo) está en `AGENTS.md`.
+Origen: auditoría del 23/10/2026. Este documento es la especificación de trabajo; mantenerlo actualizado (checklists, decisiones y "Estado actual") al cerrar cada fase. La guía para agentes (invariantes, comandos, mapa del código, forma de trabajo) está en `AGENTS.md`. Las investigaciones de problemas (mediciones, alternativas, bugs encontrados) están en `docs/informes/`.
 
 ## Estado actual (para retomar)
 
@@ -255,6 +255,8 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 
 ### Compresión de fotos (27/10/2026)
 
+Informe completo: [`docs/informes/2026-10-27-fotos-espacio-y-velocidad.md`](informes/2026-10-27-fotos-espacio-y-velocidad.md).
+
 Pedido del usuario: el respaldo en Drive crecía rápido (unos 590 KB por foto de cuaderno). Comprimir en un ZIP no sirve: medido en el teléfono, gzip ahorra 0,25 % sobre JPEG, y además rompería el respaldo incremental. Se achica al **guardar** (ahorra en el teléfono y en Drive por igual).
 
 Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial impreso, pizarrones), codificadas en el Pixel 8 con los codificadores de Android, y recortes ampliados para comparar la legibilidad:
@@ -274,6 +276,8 @@ Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial imp
 - Antes de Android 11 se usa `CompressFormat.WEBP`, que con calidad < 100 también es con pérdida. Las transparencias se siguen componiendo sobre blanco.
 
 ### Carga de fotos (27/10/2026)
+
+Informe completo: [`docs/informes/2026-10-27-fotos-espacio-y-velocidad.md`](informes/2026-10-27-fotos-espacio-y-velocidad.md).
 
 Pedido del usuario: cargar 25 fotos de la galería se sentía muy lento. Medición en el Pixel 8 con fotos del tamaño de las de la cámara (4080×3072, EXIF 90): ~1 s por foto, de los cuales ~0,7 s son la codificación WebP (Android no permite elegir un modo más rápido). En paralelo: de a 2, 0,55 s por foto; de a 3, 0,42 s; de a 4, 0,37 s.
 
