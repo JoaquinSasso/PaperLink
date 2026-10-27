@@ -11,6 +11,7 @@ Actualizado: 26/10/2026.
   1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual (en una instalación limpia): Drive no debe cambiar y la app debe avisar que el respaldo automático quedó en pausa.
 - **Pendiente del usuario (Fase 3):** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
 - **Siguiente después:** Fase 5 (pulido y publicación).
+- **Fotos en WebP (27/10/2026):** las fotos nuevas se guardan en WebP 2400 px q70 (≈ −79 %). Falta que el usuario saque una foto con la cámara de la app y la vea en el visor (los tests instrumentados ya lo cubren en el Pixel; la prueba manual no se pudo hacer porque el teléfono estaba bloqueado). Las fotos viejas quedan en JPEG. Posible siguiente paso: comprimir videos (decisión pendiente: dependencia Media3 Transformer y opción para el usuario).
 - **Garantías:** 1 a 11 implementadas y probadas (fases 1 a 3). 12 a 15 implementadas en la Fase 4 y cubiertas por tests; la restauración completa se probó en el teléfono.
 - **Matriz de casos difíciles pendiente:** foto HEIC real y video de más de 1 GB (el usuario no tenía archivos así), dispositivo de gama baja y build de release con R8 → Fase 5.
 - **Herramientas:** el trabajo de las fases 0 a 3 se hizo con Claude Code; desde acá se puede seguir con Antigravity (`AGENTS.md`, `.agents/rules/`, `.agents/workflows/`: `/fase`, `/probar`, `/retomar`) o con Claude Code (`CLAUDE.md` importa `AGENTS.md`).
@@ -78,7 +79,7 @@ data class Attachment(
 
 ## 5. Componentes
 
-- **`AttachmentStore`**: único componente que toca el disco. `import(uri, kind): ImportResult`, `delete(relativePath)`, `uriFor(relativePath)`, `fileFor(relativePath)`. Escribe en `filesDir/media/`. Las imágenes se re-codifican a JPEG con el lado mayor ≤ 3000 px y calidad 85 (valores en constantes). Testeado.
+- **`AttachmentStore`**: único componente que toca el disco. `import(uri, kind): ImportResult`, `delete(relativePath)`, `uriFor(relativePath)`, `fileFor(relativePath)`. Escribe en `filesDir/media/`. Las imágenes se re-codifican a **WebP con pérdida, lado mayor ≤ 2400 px y calidad 70** (valores en constantes; hasta el 27/10/2026 era JPEG 3000 px q85, ver "Compresión de fotos" más abajo). Testeado.
 - **`LinkRepository`**: CRUD de `Link` + `Attachment` en transacciones, búsqueda por código y por etiqueta, recientes.
 - Crear, agregar y borrar (con deshacer) son métodos de `LinkRepository`; la generación de código es una función pura junto al alfabeto. Sin capa de casos de uso.
 - **Room:** versión 3 del mismo archivo `paperlink.db`, con `fallbackToDestructiveMigrationFrom(dropAllTables = true, 1, 2)` para descartar las versiones viejas sin crashear al actualizar. De la 3 en adelante, migraciones reales con test (`MigrationTestHelper`). Sacar `/app/schemas` del `.gitignore`.
@@ -251,6 +252,26 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 - [ ] Google Cloud para publicar: pantalla de consentimiento en *En producción* y cliente Android con la SHA-1 de Play App Signing (`docs/GOOGLE_CLOUD.md`, paso 5).
 - **Criterio:** `bundleRelease` instalado vía `bundletool` funciona de punta a punta.
 
+### Compresión de fotos (27/10/2026)
+
+Pedido del usuario: el respaldo en Drive crecía rápido (unos 590 KB por foto de cuaderno). Comprimir en un ZIP no sirve: medido en el teléfono, gzip ahorra 0,25 % sobre JPEG, y además rompería el respaldo incremental. Se achica al **guardar** (ahorra en el teléfono y en Drive por igual).
+
+Prueba con 25 fotos reales del usuario (cuaderno en lápiz y birome, parcial impreso, pizarrones), codificadas en el Pixel 8 con los codificadores de Android, y recortes ampliados para comparar la legibilidad:
+
+| Variante | Promedio | Frente a JPEG 3000 q85 | 400 fotos |
+| --- | --- | --- | --- |
+| JPEG 3000 q85 (antes) | 590 KB | — | ~230 MB |
+| JPEG 2400 q80 | 339 KB | −42 % | ~133 MB |
+| WebP 3000 q80 | 255 KB | −57 % | ~100 MB |
+| WebP 2400 q80 | 167 KB | −72 % | ~65 MB |
+| **WebP 2400 q70 (elegida)** | **124 KB** | **−79 %** | **~49 MB** |
+| HEIC 2400 (q30 a q90) | 703–928 KB | +19 % a +57 % | 275–363 MB |
+
+- La letra se lee en todas las variantes WebP al hacer zoom; con q70 aparece algo de *banding* en reflejos de pizarrón, no en el trazo.
+- **HEIC descartado:** `HeifWriter` usa el codificador de video por hardware, que en el Pixel casi ignora la calidad pedida y da archivos más pesados que JPEG; además depende del modelo, suma una dependencia y no se abre en Android 8–9.
+- WebP codifica en ~0,4 s por foto (JPEG ~0,04 s); no se nota porque las fotos se guardan de a una.
+- Antes de Android 11 se usa `CompressFormat.WEBP`, que con calidad < 100 también es con pérdida. Las transparencias se siguen componiendo sobre blanco.
+
 ## 10. Registro de decisiones
 
 | Fecha | Decisión | Motivo |
@@ -274,3 +295,4 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 2026-10-25 | Guía única en `AGENTS.md`; soporte para Antigravity (`.agents/`) | El usuario sigue el proyecto con Antigravity; `CLAUDE.md` la importa |
 | 2026-10-26 | Respaldo en Drive con `drive.appdata` | Carpeta oculta, scope no sensible; sin necesidad de ver los archivos desde la PC |
 | 2026-10-26 | Un respaldo nunca achica Drive sin fusionar antes; sin Auto Backup de Android en la nube | Evita perder el respaldo al cambiar de teléfono o al tocar "Ahora no" |
+| 2026-10-27 | Fotos nuevas en WebP 2400 px calidad 70 (antes JPEG 3000 px q85) | −79 % de espacio en el teléfono y en Drive con la letra igual de legible; ZIP no ahorra y HEIC pesa más en Android |
