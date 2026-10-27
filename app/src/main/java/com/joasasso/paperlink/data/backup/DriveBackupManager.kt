@@ -4,6 +4,7 @@ import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.preferences.UserPreferencesRepository
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.util.log
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -14,6 +15,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -33,9 +35,16 @@ data class DriveBackupSummary(
     val merged: MergeCounts? = null,
 )
 
-/** Programa o cancela la ejecución periódica del respaldo en segundo plano. */
+/** Programa o cancela la ejecución periódica o automática del respaldo en segundo plano. */
 interface BackupScheduler {
     fun scheduleDaily(chargingOnly: Boolean)
+
+    /**
+     * Encola una sincronización automática con Wi-Fi (`UNMETERED`).
+     * @param debounce si es true, espera unos segundos antes de arrancar para agrupar varios
+     *   cambios seguidos (por ejemplo, sacar varias fotos o agregar una etiqueta).
+     */
+    fun scheduleSync(debounce: Boolean = false) = Unit
     fun cancel()
 }
 
@@ -113,6 +122,27 @@ class DriveBackupManager(
     }
 
     /**
+     * Registra que hubo cambios locales pendientes de subir y, si el respaldo automático está
+     * activo, encola una sincronización por Wi-Fi (con una breve ventana para agrupar cambios).
+     */
+    suspend fun onLocalChange() {
+        preferences.setDrivePendingSync(true)
+        if (preferences.backupSettings.first().driveEnabled) {
+            scheduler.scheduleSync(debounce = true)
+        }
+    }
+
+    /**
+     * Al abrir la app con el respaldo activo, encola una sincronización por Wi-Fi para traer
+     * posibles cambios hechos en otro dispositivo y subir lo que haya quedado pendiente.
+     */
+    suspend fun onAppOpened() {
+        if (preferences.backupSettings.first().driveEnabled) {
+            scheduler.scheduleSync(debounce = false)
+        }
+    }
+
+    /**
      * Comprueba que haya permiso para usar Drive. Si hace falta el consentimiento del usuario lanza
      * [BackupException.AuthRequired] con la pantalla de Google para mostrar (antes de pasar a
      * segundo plano, donde no se puede pedir).
@@ -152,7 +182,23 @@ class DriveBackupManager(
     suspend fun restoreFromDrive(
         onProgress: (BackupProgress) -> Unit = {},
     ): MergeCounts = mutex.withLock {
-        withValidToken { token -> restoreLocked(token, remote.listFiles(token), onProgress) }
+        withValidToken { token -> restoreWithManifestLocked(token, remote.listFiles(token), onProgress).first }
+    }
+
+    /**
+     * Sincronización incremental automática (al agregar contenido, al conectar Wi-Fi o al abrir la
+     * app):
+     * 1. Si Drive tiene un respaldo que este teléfono no fusionó ([RemoteState.NeedsMerge]), lo
+     *    descarga y une a la base local.
+     * 2. Si hay cambios locales pendientes (`pendingSync`), o si este teléfono tiene códigos o
+     *    elementos que no estaban en el respaldo remoto, sube lo nuevo a Drive.
+     * 3. Si entraron cambios locales mientras subía, repite una pasada para no dejar nada afuera.
+     *
+     * Si este teléfono ya está al día con Drive y no hay cambios locales, termina tras listar
+     * `appDataFolder` sin subir un `manifest.json` redundante.
+     */
+    suspend fun syncNow() = mutex.withLock {
+        withValidToken { token -> syncLocked(token) }
     }
 
     private suspend fun remoteStateOf(remoteFiles: List<RemoteDriveFile>): RemoteState {
@@ -166,91 +212,143 @@ class DriveBackupManager(
         }
     }
 
+    private suspend fun syncLocked(token: String) {
+        var firstPass = true
+        while (firstPass || preferences.backupSettings.first().pendingSync) {
+            firstPass = false
+            val remoteFiles = remote.listFiles(token)
+            val state = remoteStateOf(remoteFiles)
+            val remoteManifest = if (state == RemoteState.NeedsMerge) {
+                restoreWithManifestLocked(token, remoteFiles, onProgress = {}).second
+            } else {
+                null
+            }
+            val shouldUpload = when {
+                preferences.backupSettings.first().pendingSync -> true
+                state == RemoteState.None -> repository.exportSnapshot(includeMissingFiles = true).links.isNotEmpty()
+                remoteManifest != null -> hasUnbackedLocalChanges(remoteManifest)
+                else -> false
+            }
+            if (shouldUpload) {
+                uploadSnapshotLocked(token, remoteFiles, merged = null, onProgress = {})
+            }
+        }
+    }
+
+    private suspend fun hasUnbackedLocalChanges(remoteManifest: BackupManifest): Boolean {
+        val local = repository.exportSnapshot(includeMissingFiles = true)
+        val remoteLinks = remoteManifest.links.associateBy { it.code }
+        if (local.links.any { link -> link.code !in remoteLinks || remoteLinks[link.code]?.label != link.label }) {
+            return true
+        }
+        val remoteAttachmentIds = remoteManifest.attachments.mapTo(HashSet()) { it.id }
+        return local.attachments.any { it.id !in remoteAttachmentIds }
+    }
+
     private suspend fun backupLocked(token: String, onProgress: (BackupProgress) -> Unit): DriveBackupSummary {
         val remoteFiles = remote.listFiles(token)
         val merged = if (remoteStateOf(remoteFiles) == RemoteState.NeedsMerge) {
-            restoreLocked(token, remoteFiles) { onProgress(it.copy(merging = true)) }
+            restoreWithManifestLocked(token, remoteFiles) { onProgress(it.copy(merging = true)) }.first
         } else {
             null
         }
-        val existingNames = remoteFiles.mapTo(HashSet()) { it.name }
+        return uploadSnapshotLocked(token, remoteFiles, merged, onProgress)
+    }
 
-        // Cada archivo en media/<uuid>.<ext> es inmutable; solo se sube si no está ya en Drive.
-        val snapshot = repository.exportSnapshot(includeMissingFiles = true)
-        val toUpload = LinkedHashSet<String>()
-        val kept = snapshot.attachments.filter { att ->
-            val path = att.relativePath ?: return@filter true
-            when {
-                store.exists(path) -> {
-                    if (path !in existingNames) toUpload += path
-                    true
-                }
-                // Falta en el teléfono pero sigue en Drive: se conserva (no se borra la copia).
-                path in existingNames -> true
-                else -> {
-                    log("File missing locally and in Drive, left out of the backup: $path")
-                    false
+    private suspend fun uploadSnapshotLocked(
+        token: String,
+        remoteFiles: List<RemoteDriveFile>,
+        merged: MergeCounts?,
+        onProgress: (BackupProgress) -> Unit,
+    ): DriveBackupSummary {
+        val wasPending = preferences.backupSettings.first().pendingSync
+        if (wasPending) preferences.setDrivePendingSync(false)
+        try {
+            val existingNames = remoteFiles.mapTo(HashSet()) { it.name }
+
+            // Cada archivo en media/<uuid>.<ext> es inmutable; solo se sube si no está ya en Drive.
+            val snapshot = repository.exportSnapshot(includeMissingFiles = true)
+            val toUpload = LinkedHashSet<String>()
+            val kept = snapshot.attachments.filter { att ->
+                val path = att.relativePath ?: return@filter true
+                when {
+                    store.exists(path) -> {
+                        if (path !in existingNames) toUpload += path
+                        true
+                    }
+                    // Falta en el teléfono pero sigue en Drive: se conserva (no se borra la copia).
+                    path in existingNames -> true
+                    else -> {
+                        log("File missing locally and in Drive, left out of the backup: $path")
+                        false
+                    }
                 }
             }
-        }
-        val manifest = snapshot.copy(attachments = kept)
-        val mimeByPath = kept.filter { it.relativePath != null }.associate { it.relativePath!! to it.mimeType }
+            val manifest = snapshot.copy(attachments = kept)
+            val mimeByPath = kept.filter { it.relativePath != null }.associate { it.relativePath!! to it.mimeType }
 
-        onProgress(BackupProgress(0, toUpload.size))
-        val started = clock()
-        inParallel(toUpload) { path, done ->
-            val length = store.length(path)
-            store.readFile(path) { input ->
-                remote.uploadStream(token, path, mimeByPath[path] ?: DEFAULT_MIME_TYPE, length, input)
+            onProgress(BackupProgress(0, toUpload.size))
+            val started = clock()
+            inParallel(toUpload) { path, done ->
+                val length = store.length(path)
+                store.readFile(path) { input ->
+                    remote.uploadStream(token, path, mimeByPath[path] ?: DEFAULT_MIME_TYPE, length, input)
+                }
+                onProgress(BackupProgress(done(), toUpload.size))
             }
-            onProgress(BackupProgress(done(), toUpload.size))
-        }
-        log("Drive backup: ${toUpload.size} files uploaded in ${clock() - started} ms")
+            log("Drive backup: ${toUpload.size} files uploaded in ${clock() - started} ms")
 
-        // El manifest se sube SIEMPRE al final (garantía 12).
-        currentCoroutineContext().ensureActive()
-        val manifestBytes = json.encodeToString(manifest).toByteArray(Charsets.UTF_8)
-        val uploadedManifest = remote.uploadStream(
-            accessToken = token,
-            name = BackupManifest.MANIFEST_FILE_NAME,
-            mimeType = "application/json",
-            contentLength = manifestBytes.size.toLong(),
-            contentStream = ByteArrayInputStream(manifestBytes),
-        )
+            // El manifest se sube SIEMPRE al final (garantía 12).
+            currentCoroutineContext().ensureActive()
+            val manifestBytes = json.encodeToString(manifest).toByteArray(Charsets.UTF_8)
+            val uploadedManifest = remote.uploadStream(
+                accessToken = token,
+                name = BackupManifest.MANIFEST_FILE_NAME,
+                mimeType = "application/json",
+                contentLength = manifestBytes.size.toLong(),
+                contentStream = ByteArrayInputStream(manifestBytes),
+            )
 
-        // Limpieza posterior al commit del nuevo manifest: si falla no invalida el respaldo ya subido.
-        val referencedPaths = kept.mapNotNullTo(HashSet()) { it.relativePath }
-        for (oldFile in remoteFiles) {
-            val isOldManifest = oldFile.name == BackupManifest.MANIFEST_FILE_NAME && oldFile.id != uploadedManifest.id
-            val isOrphanMedia = oldFile.name != BackupManifest.MANIFEST_FILE_NAME && oldFile.name !in referencedPaths
-            if (isOldManifest || isOrphanMedia) {
+            // Limpieza posterior al commit del nuevo manifest en paralelo: si falla no invalida el respaldo ya subido.
+            val referencedPaths = kept.mapNotNullTo(HashSet()) { it.relativePath }
+            val obsoleteFiles = remoteFiles.filter { oldFile ->
+                val isOldManifest = oldFile.name == BackupManifest.MANIFEST_FILE_NAME && oldFile.id != uploadedManifest.id
+                val isOrphanMedia = oldFile.name != BackupManifest.MANIFEST_FILE_NAME && oldFile.name !in referencedPaths
+                isOldManifest || isOrphanMedia
+            }
+            inParallel(obsoleteFiles) { oldFile, _ ->
                 try {
                     remote.deleteFile(token, oldFile.id)
                 } catch (e: BackupException) {
                     log("Could not delete old Drive file ${oldFile.name}", e)
                 }
             }
+
+            val totalSize = manifestBytes.size.toLong() +
+                kept.filter { it.relativePath != null }.distinctBy { it.relativePath }.sumOf { it.sizeBytes ?: 0L }
+            val now = clock()
+            preferences.recordDriveBackupSuccess(now, totalSize, uploadedManifest.id)
+
+            return DriveBackupSummary(
+                timestamp = now,
+                totalSizeBytes = totalSize,
+                uploadedFiles = toUpload.size,
+                totalLinks = manifest.links.size,
+                merged = merged,
+            )
+        } catch (t: Throwable) {
+            if (wasPending) {
+                withContext(NonCancellable) { preferences.setDrivePendingSync(true) }
+            }
+            throw t
         }
-
-        val totalSize = manifestBytes.size.toLong() +
-            kept.filter { it.relativePath != null }.distinctBy { it.relativePath }.sumOf { it.sizeBytes ?: 0L }
-        val now = clock()
-        preferences.recordDriveBackupSuccess(now, totalSize, uploadedManifest.id)
-
-        return DriveBackupSummary(
-            timestamp = now,
-            totalSizeBytes = totalSize,
-            uploadedFiles = toUpload.size,
-            totalLinks = manifest.links.size,
-            merged = merged,
-        )
     }
 
-    private suspend fun restoreLocked(
+    private suspend fun restoreWithManifestLocked(
         token: String,
         remoteFiles: List<RemoteDriveFile>,
         onProgress: (BackupProgress) -> Unit,
-    ): MergeCounts {
+    ): Pair<MergeCounts, BackupManifest> {
         val manifestFile = remoteFiles.firstOrNull { it.name == BackupManifest.MANIFEST_FILE_NAME }
             ?: throw BackupException.NoRemoteBackup()
         val manifest = downloadManifest(token, manifestFile.id)
@@ -283,7 +381,7 @@ class DriveBackupManager(
             }
             val counts = repository.commitBackup(manifest, newlyRestoredPaths)
             preferences.recordDriveRestore(manifestFile.id)
-            return counts
+            return counts to manifest
         } catch (t: Throwable) {
             repository.discardRestoredFiles(newlyRestoredPaths)
             throw t

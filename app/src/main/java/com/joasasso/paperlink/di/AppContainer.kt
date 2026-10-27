@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Contenedor de dependencias de la aplicación (DI manual).
@@ -35,7 +36,12 @@ class AppContainer(context: Context) {
     val attachmentStore: AttachmentStore by lazy { AttachmentStore(context) }
 
     val linkRepository: LinkRepository by lazy {
-        LinkRepository(database.linkDao(), attachmentStore, applicationScope)
+        LinkRepository(
+            dao = database.linkDao(),
+            store = attachmentStore,
+            externalScope = applicationScope,
+            onChanged = { applicationScope.launch { driveBackupManager.onLocalChange() } },
+        )
     }
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {

@@ -23,6 +23,7 @@ import com.joasasso.paperlink.ui.navigation.CameraDestination
 import com.joasasso.paperlink.ui.navigation.PaperLinkNavHost
 import com.joasasso.paperlink.ui.navigation.ShareDestination
 import com.joasasso.paperlink.ui.theme.PaperLinkTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -73,6 +74,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private var lastKnownFirstLaunch: Boolean = false
+
+    override fun onStart() {
+        super.onStart()
+        if (!isChangingConfigurations) {
+            val container = (application as PaperLinkApp).container
+            container.applicationScope.launch {
+                container.driveBackupManager.onAppOpened()
+            }
+        }
+    }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)

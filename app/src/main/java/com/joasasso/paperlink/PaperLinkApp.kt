@@ -38,7 +38,11 @@ class PaperLinkApp : Application(), SingletonImageLoader.Factory {
             container.linkRepository.runMaintenance()
             val backupSettings = container.userPreferencesRepository.backupSettings.first()
             if (backupSettings.driveEnabled) {
-                WorkManagerBackupScheduler(this@PaperLinkApp).ensureScheduled(backupSettings.chargingOnly)
+                val scheduler = WorkManagerBackupScheduler(this@PaperLinkApp)
+                scheduler.ensureScheduled(backupSettings.chargingOnly)
+                if (backupSettings.pendingSync) {
+                    scheduler.scheduleSync(debounce = false)
+                }
             }
         }
         publishCaptureShortcut()

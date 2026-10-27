@@ -57,7 +57,8 @@ class BackupTest {
         val db: PaperLinkDatabase = Room.inMemoryDatabaseBuilder(context, PaperLinkDatabase::class.java).build()
         val scope = CoroutineScope(SupervisorJob())
         val store = AttachmentStore(context, dir.base)
-        val repository = LinkRepository(db.linkDao(), store, scope)
+        var onRepositoryChanged: () -> Unit = {}
+        val repository = LinkRepository(db.linkDao(), store, scope, onChanged = { onRepositoryChanged() })
         val preferences = UserPreferencesRepository(
             PreferenceDataStoreFactory.create(scope = scope) {
                 File(dir.root, "prefs-${UUID.randomUUID()}.preferences_pb")
@@ -487,6 +488,84 @@ class BackupTest {
         assertEquals(1_000L, settings.driveEnabledAt)
     }
 
+    @Test
+    fun autoSync_uploadsOnLocalChange_andPullsRemoteChangesOnAppOpenWithoutPingPong() = runBlocking {
+        val remote = FakeDriveRemoteStore()
+        val sourceScheduler = FakeBackupScheduler()
+        val targetScheduler = FakeBackupScheduler()
+        val sourceDrive = drive(sourceNode, remote, sourceScheduler)
+        val targetDrive = drive(targetNode, remote, targetScheduler)
+        sourceDrive.enableDriveBackup()
+        targetDrive.enableDriveBackup()
+
+        // Cuando el usuario agrega un código en el teléfono A con respaldo activo, queda pendiente y encola sync con debounce.
+        var changeNotified = false
+        sourceNode.onRepositoryChanged = { changeNotified = true }
+        val codeA = sourceNode.createFileLink("a.bin")
+        assertTrue(changeNotified)
+        sourceDrive.onLocalChange()
+        assertTrue(sourceNode.preferences.backupSettings.first().pendingSync)
+        assertEquals(1, sourceScheduler.syncScheduledCount)
+        assertEquals(true, sourceScheduler.lastSyncDebounce)
+
+        // Al ejecutarse el worker en Wi-Fi, sube el cambio y limpia pendingSync.
+        sourceDrive.syncNow()
+        assertTrue(!sourceNode.preferences.backupSettings.first().pendingSync)
+        assertEquals(DriveBackupManager.RemoteState.InSync, sourceDrive.checkRemoteState())
+
+        // El teléfono B abre la app con Wi-Fi (sin cambios locales propios): busca cambios en Drive,
+        // los fusiona localmente y NO sube un manifest redundante (ambos quedan InSync).
+        targetDrive.onAppOpened()
+        assertEquals(1, targetScheduler.syncScheduledCount)
+        assertEquals(false, targetScheduler.lastSyncDebounce)
+        val uploadsBeforeB = remote.uploadOrder.size
+        targetDrive.syncNow()
+        assertEquals("No debe subir un nuevo manifest si B no tenía cambios locales", uploadsBeforeB, remote.uploadOrder.size)
+        assertNotNull(targetNode.repository.getLink(codeA))
+        assertEquals(DriveBackupManager.RemoteState.InSync, targetDrive.checkRemoteState())
+        assertEquals(DriveBackupManager.RemoteState.InSync, sourceDrive.checkRemoteState())
+    }
+
+    @Test
+    fun autoSync_keepsPendingOnNetworkFailure_andMergesBeforeUploadingWhenBothChanged() = runBlocking {
+        val remote = FakeDriveRemoteStore()
+        val sourceDrive = drive(sourceNode, remote)
+        val targetDrive = drive(targetNode, remote)
+        sourceDrive.enableDriveBackup()
+        targetDrive.enableDriveBackup()
+
+        // Si la subida falla por red, pendingSync sigue en true para reintentar cuando vuelva el Wi-Fi o al abrir la app.
+        val codeA = sourceNode.createFileLink("a.bin")
+        sourceDrive.onLocalChange()
+        remote.failOnUploadName = BackupManifest.MANIFEST_FILE_NAME
+        try {
+            sourceDrive.syncNow()
+            fail("Expected NetworkError")
+        } catch (_: BackupException.NetworkError) {
+            // Esperado
+        }
+        assertTrue("Sigue pendiente tras un fallo de red", sourceNode.preferences.backupSettings.first().pendingSync)
+
+        // En el reintento con red funciona y limpia pendingSync.
+        remote.failOnUploadName = null
+        sourceDrive.syncNow()
+        assertTrue(!sourceNode.preferences.backupSettings.first().pendingSync)
+
+        // Si B también agregó algo sin Wi-Fi (pendingSync = true) y después conecta Wi-Fi,
+        // syncNow() primero trae lo de A y después sube la unión con lo de B.
+        val codeB = targetNode.createFileLink("b.bin")
+        targetDrive.onLocalChange()
+        targetDrive.syncNow()
+        assertTrue(!targetNode.preferences.backupSettings.first().pendingSync)
+        assertEquals(setOf(codeA, codeB), targetNode.repository.allCodes().toSet())
+
+        // Cuando A abre la app con Wi-Fi, recibe lo de B sin volver a subir.
+        val uploadsBeforeA = remote.uploadOrder.size
+        sourceDrive.syncNow()
+        assertEquals(uploadsBeforeA, remote.uploadOrder.size)
+        assertEquals(setOf(codeA, codeB), sourceNode.repository.allCodes().toSet())
+    }
+
     private class FakeTokenProvider(var shouldFailAuth: Boolean = false) : DriveTokenProvider {
         override suspend fun getAccessToken(): String {
             if (shouldFailAuth) throw BackupException.AuthRequired()
@@ -499,10 +578,17 @@ class BackupTest {
     private class FakeBackupScheduler : BackupScheduler {
         var scheduled = false
         var lastChargingOnly = false
+        var syncScheduledCount = 0
+        var lastSyncDebounce: Boolean? = null
 
         override fun scheduleDaily(chargingOnly: Boolean) {
             scheduled = true
             lastChargingOnly = chargingOnly
+        }
+
+        override fun scheduleSync(debounce: Boolean) {
+            syncScheduledCount++
+            lastSyncDebounce = debounce
         }
 
         override fun cancel() {

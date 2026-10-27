@@ -65,6 +65,7 @@ class LinkRepository(
     private val externalScope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
     private val random: Random = Random.Default,
+    private val onChanged: () -> Unit = {},
 ) {
 
     // --- Lectura ---
@@ -132,7 +133,10 @@ class LinkRepository(
                 val code = CodeAlphabet.generate(random)
                 val link = Link(code, label.normalizeLabel(), createdAt = now, updatedAt = now, deletedAt = null)
                 val attachments = prepared.attachments.mapIndexed { i, a -> a.copy(linkCode = code, position = i) }
-                if (dao.insertLinkWithAttachments(link, attachments)) return code
+                if (dao.insertLinkWithAttachments(link, attachments)) {
+                    onChanged()
+                    return code
+                }
                 log("Code collision, retrying")
             }
             throw CodeSpaceExhaustedException()
@@ -151,7 +155,10 @@ class LinkRepository(
         val now = clock()
         repeat(CodeAlphabet.MAX_RETRIES) {
             val code = CodeAlphabet.generate(random)
-            if (dao.insertLinkOrIgnore(Link(code, null, createdAt = now, updatedAt = now, deletedAt = null)) != -1L) return code
+            if (dao.insertLinkOrIgnore(Link(code, null, createdAt = now, updatedAt = now, deletedAt = null)) != -1L) {
+                onChanged()
+                return code
+            }
             log("Code collision, retrying")
         }
         throw CodeSpaceExhaustedException()
@@ -169,6 +176,7 @@ class LinkRepository(
         val prepared = prepare(sources, now, onProgress)
         try {
             if (!dao.appendAttachments(normalized, prepared.attachments, now)) throw LinkNotFoundException(normalized)
+            onChanged()
         } catch (t: Throwable) {
             discardFiles(prepared.importedPaths)
             throw t
@@ -178,6 +186,7 @@ class LinkRepository(
     suspend fun setLabel(code: String, label: String?) {
         val normalized = CodeAlphabet.normalize(code)
         if (dao.updateLabel(normalized, label.normalizeLabel(), clock()) == 0) throw LinkNotFoundException(normalized)
+        onChanged()
     }
 
     // --- Borrado ---
@@ -217,7 +226,12 @@ class LinkRepository(
     /** Elimina físicamente códigos y elementos borrados hace más de [UNDO_WINDOW_MS]. */
     suspend fun purgeExpired() {
         val cutoff = clock() - UNDO_WINDOW_MS
-        deleteFiles(dao.purgeDeletedBefore(cutoff) + dao.purgeAttachmentsDeletedBefore(cutoff))
+        val links = dao.purgeDeletedBefore(cutoff)
+        val attachments = dao.purgeAttachmentsDeletedBefore(cutoff)
+        deleteFiles(links.filePaths + attachments.filePaths)
+        if (links.deletedCount + attachments.deletedCount > 0) {
+            onChanged()
+        }
     }
 
     /**

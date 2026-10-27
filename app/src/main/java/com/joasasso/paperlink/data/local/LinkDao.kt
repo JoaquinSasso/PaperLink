@@ -82,10 +82,10 @@ interface LinkDao {
      * rutas de sus archivos, para borrarlas del disco después del commit.
      */
     @Transaction
-    suspend fun purgeDeletedBefore(cutoff: Long): List<String> {
+    suspend fun purgeDeletedBefore(cutoff: Long): PurgeResult {
         val paths = filesOfDeletedBefore(cutoff)
-        deleteLinksDeletedBefore(cutoff)
-        return paths
+        val count = deleteLinksDeletedBefore(cutoff)
+        return PurgeResult(deletedCount = count, filePaths = paths)
     }
 
     // --- Lectura ---
@@ -138,10 +138,10 @@ interface LinkDao {
     suspend fun deleteAttachmentsDeletedBefore(cutoff: Long): Int
 
     @Transaction
-    suspend fun purgeAttachmentsDeletedBefore(cutoff: Long): List<String> {
+    suspend fun purgeAttachmentsDeletedBefore(cutoff: Long): PurgeResult {
         val paths = filesOfAttachmentsDeletedBefore(cutoff)
-        deleteAttachmentsDeletedBefore(cutoff)
-        return paths
+        val count = deleteAttachmentsDeletedBefore(cutoff)
+        return PurgeResult(deletedCount = count, filePaths = paths)
     }
 
     // --- Respaldo ---
@@ -206,3 +206,5 @@ interface LinkDao {
         return MergeCounts(addedLinks = addedLinks, addedAttachments = addedAttachments)
     }
 }
+
+data class PurgeResult(val deletedCount: Int, val filePaths: List<String>)

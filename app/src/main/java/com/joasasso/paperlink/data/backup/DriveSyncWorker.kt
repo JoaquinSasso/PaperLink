@@ -50,14 +50,18 @@ class DriveSyncWorker(
     override suspend fun doWork(): Result = coroutineScope {
         val manager = (applicationContext as PaperLinkApp).container.driveBackupManager
         ensureChannel(applicationContext)
-        setForeground(foregroundInfo(null))
+        // Si WorkManager arranca el trabajo cuando la app ya pasó a segundo plano, Android 12+ no
+        // permite promoverlo a servicio en primer plano; igual corre con la cuota de JobScheduler.
+        runCatching { setForeground(foregroundInfo(null)) }
+            .onFailure { notify(NOTIFICATION_ID_PROGRESS, progressNotification(null)) }
 
         // El progreso llega por archivo; se publica el último (conflado) para no saturar.
         val progress = MutableStateFlow<BackupProgress?>(null)
         val publisher = launch {
             progress.filterNotNull().collect { p ->
                 setProgress(progressData(p))
-                setForeground(foregroundInfo(p))
+                runCatching { setForeground(foregroundInfo(p)) }
+                    .onFailure { notify(NOTIFICATION_ID_PROGRESS, progressNotification(p)) }
             }
         }
         try {
@@ -88,6 +92,7 @@ class DriveSyncWorker(
             Result.failure(workDataOf(KEY_ERROR to message))
         } finally {
             publisher.cancel()
+            notifications.cancel(NOTIFICATION_ID_PROGRESS)
         }
     }
 

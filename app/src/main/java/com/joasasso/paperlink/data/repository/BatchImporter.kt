@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -66,6 +67,11 @@ class BatchImporter(
     val statuses: StateFlow<Map<String, Status>> = _statuses.asStateFlow()
 
     fun status(code: String): Flow<Status?> = statuses.map { it[code] }.distinctUntilChanged()
+
+    /** Espera a que terminen las cargas en segundo plano en curso (si hay alguna). */
+    suspend fun awaitIdle() {
+        statuses.first { current -> current.values.none { it.running } }
+    }
 
     /**
      * Guarda [sources] en un código nuevo ([appendTo] null) o existente y devuelve el código enseguida.

@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -15,8 +17,9 @@ import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
- * Tarea periódica de WorkManager que ejecuta el respaldo incremental en Google Drive
- * una vez por día con conexión Wi-Fi (no medida) y, opcionalmente, solo cargando.
+ * Tarea de WorkManager que sincroniza en segundo plano con Google Drive cuando hay conexión Wi-Fi
+ * (no medida): corre al agregar o modificar contenido, al abrir la app con Wi-Fi, al conectarse a
+ * una red Wi-Fi si había quedado pendiente, y además una vez por día como respaldo periódico.
  */
 class DriveBackupWorker(
     appContext: Context,
@@ -29,25 +32,27 @@ class DriveBackupWorker(
         if (!settings.driveEnabled) return Result.success()
 
         return try {
-            container.driveBackupManager.backupNow()
-            log("Periodic Drive backup succeeded")
+            container.batchImporter.awaitIdle()
+            container.driveBackupManager.syncNow()
+            log("Automatic Drive sync succeeded")
             Result.success()
         } catch (e: CancellationException) {
             throw e
         } catch (e: BackupException.AuthRequired) {
-            log("Periodic Drive backup requires re-authorization", e)
+            log("Automatic Drive sync requires re-authorization", e)
             Result.failure()
         } catch (e: BackupException.NetworkError) {
-            log("Periodic Drive backup network error (attempt $runAttemptCount)", e)
+            log("Automatic Drive sync network error (attempt $runAttemptCount)", e)
             if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
         } catch (e: Exception) {
-            log("Periodic Drive backup failed", e)
+            log("Automatic Drive sync failed", e)
             Result.failure()
         }
     }
 
     companion object {
         const val UNIQUE_WORK_NAME = "paperlink_daily_drive_backup"
+        const val UNIQUE_SYNC_WORK_NAME = "paperlink_auto_drive_sync"
         private const val MAX_RETRIES = 3
     }
 }
@@ -65,6 +70,22 @@ class WorkManagerBackupScheduler(
 
     fun ensureScheduled(chargingOnly: Boolean) {
         enqueue(chargingOnly, ExistingPeriodicWorkPolicy.KEEP)
+    }
+
+    override fun scheduleSync(debounce: Boolean) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .build()
+        val builder = OneTimeWorkRequestBuilder<DriveBackupWorker>()
+            .setConstraints(constraints)
+        if (debounce) {
+            builder.setInitialDelay(SYNC_DEBOUNCE_SECONDS, TimeUnit.SECONDS)
+        }
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DriveBackupWorker.UNIQUE_SYNC_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            builder.build(),
+        )
     }
 
     private fun enqueue(chargingOnly: Boolean, policy: ExistingPeriodicWorkPolicy) {
@@ -87,6 +108,12 @@ class WorkManagerBackupScheduler(
     }
 
     override fun cancel() {
-        WorkManager.getInstance(context).cancelUniqueWork(DriveBackupWorker.UNIQUE_WORK_NAME)
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelUniqueWork(DriveBackupWorker.UNIQUE_WORK_NAME)
+        workManager.cancelUniqueWork(DriveBackupWorker.UNIQUE_SYNC_WORK_NAME)
+    }
+
+    companion object {
+        private const val SYNC_DEBOUNCE_SECONDS = 3L
     }
 }

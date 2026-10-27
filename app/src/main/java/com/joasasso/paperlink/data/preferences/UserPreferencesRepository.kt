@@ -38,6 +38,8 @@ data class BackupSettings(
      * otro, Drive tiene contenido que este teléfono no conoce y no se lo puede pisar.
      */
     val syncedManifestId: String? = null,
+    /** True si se agregaron o modificaron códigos localmente y falta subirlos a Drive. */
+    val pendingSync: Boolean = false,
 ) {
     /**
      * True si el respaldo está activo y no hubo uno exitoso en más de 7 días (garantía 13).
@@ -81,6 +83,7 @@ class UserPreferencesRepository(
         val BACKUP_SUGGESTION_DISMISSED = booleanPreferencesKey("backup_suggestion_dismissed")
         val DRIVE_ENABLED_AT = longPreferencesKey("drive_enabled_at")
         val DRIVE_SYNCED_MANIFEST_ID = stringPreferencesKey("drive_synced_manifest_id")
+        val DRIVE_PENDING_SYNC = booleanPreferencesKey("drive_pending_sync")
         val PENDING_IMPORTS = stringPreferencesKey("pending_imports")
     }
 
@@ -110,6 +113,7 @@ class UserPreferencesRepository(
             suggestionDismissed = preferences[PreferencesKeys.BACKUP_SUGGESTION_DISMISSED] ?: false,
             driveEnabledAt = preferences[PreferencesKeys.DRIVE_ENABLED_AT],
             syncedManifestId = preferences[PreferencesKeys.DRIVE_SYNCED_MANIFEST_ID],
+            pendingSync = preferences[PreferencesKeys.DRIVE_PENDING_SYNC] ?: false,
         )
     }
 
@@ -171,6 +175,12 @@ class UserPreferencesRepository(
     suspend fun setDriveChargingOnly(chargingOnly: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.DRIVE_CHARGING_ONLY] = chargingOnly
+        }
+    }
+
+    suspend fun setDrivePendingSync(pending: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DRIVE_PENDING_SYNC] = pending
         }
     }
 
