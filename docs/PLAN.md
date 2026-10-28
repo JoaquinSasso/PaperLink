@@ -11,6 +11,7 @@ Actualizado: 27/10/2026.
   1. Probar en el teléfono "Ahora no" en el aviso de respaldo encontrado, con la versión actual (en una instalación limpia): Drive no debe cambiar y la app debe avisar que el respaldo automático quedó en pausa.
 - **Pendiente de Fase 3:** verificar con TalkBack el ingreso de código en la Home (tiene que anunciarse "Código, N de 4 caracteres", leer las letras de a una y permitir pegar).
 - **Siguiente después:** Fase 5 (pulido y publicación).
+- **Pantalla del código unificada (27/10/2026):** al abrir o crear un código se llega siempre a la misma pantalla (código, etiqueta y grilla de elementos, "Agregar" a la vista, selección múltiple para borrar). Fotos al visor, notas a su vista, el resto se abre directo con otra app. Reemplaza al detalle escondido detrás de la (i) y a la pantalla tras crear (ver "Pantalla del código unificada" más abajo). Probado en el Pixel salvo crear con la cámara.
 - **Respaldo en Drive más rápido y sincronización automática por Wi-Fi (27/10/2026):** subida `multipart` para ≤ 5 MB y hasta 8 archivos en paralelo sobre HTTP/2 (16 fotos de 124 KB bajan de 74,1 s a 3,8 s: **19,5× más rápido**), respaldo manual en segundo plano (`DriveSyncWorker`) y sincronización automática por Wi-Fi al crear/editar/purgar contenido (con *debounce* de 3 s y cola pendiente `pendingSync` si no hay Wi-Fi) y al abrir la app (fusiona cambios hechos en otro dispositivo sin volver a subir si no hubo cambios locales). Ver [`docs/informes/2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md`](informes/2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md).
 - **Carga de varias fotos más rápida (27/10/2026):** 3 fotos a la vez y código visible al instante (ver "Carga de fotos" más abajo). Probado en el Pixel 8 con 25 fotos: código a los 9 ms y todo guardado en 4,2 s (logs de debug `Batch: …`). Compartir desde otra app sigue igual (paso siguiente).
 - **Fotos en WebP (27/10/2026):** las fotos nuevas se guardan en WebP 2400 px q70 (≈ −79 %). Falta probar manualmente sacar una foto con la cámara de la app y verla en el visor (los tests instrumentados ya lo cubren en el Pixel; la prueba en vivo no se pudo hacer porque el teléfono estaba bloqueado). Las fotos viejas quedan en JPEG. Posible siguiente paso: comprimir videos (decisión pendiente: dependencia Media3 Transformer y si va como opción en ajustes).
@@ -92,12 +93,12 @@ data class Attachment(
 ## 6. Flujos de UX
 
 1. **Capturar:** widget o atajo del ícono de la app → cámara propia → 1 a N fotos → "Listo".
-2. **Pantalla del código** (nueva, obligatoria tras crear): código gigante en JetBrains Mono, vibración de confirmación, campo de etiqueta opcional, botones "Agregar más" y "Listo". Desde la Home se puede volver al "último código creado".
-3. **Recuperar:** la Home es el campo de código arriba, los recientes abajo (lista con miniatura, etiqueta y fecha; no grilla de todo) y búsqueda por etiqueta. Al completar 4 caracteres, si existe, abre; si no, error claro + sugerencias.
-4. **Ver:** visor propio con zoom (pinch/doble toque) y deslizamiento entre los archivos del código. Video, audio, PDF y archivos pueden abrirse con apps externas en esta versión.
+2. **Pantalla del código** (única, para crear y para abrir; desde el 27/10/2026): código grande en JetBrains Mono, etiqueta opcional siempre editable, grilla con todos los elementos y botón "Agregar" a la vista. Recién creado: vibración de confirmación, aviso para anotarlo y botón "Listo". Desde la Home se puede volver al "último código creado".
+3. **Recuperar:** la Home es el campo de código arriba, los recientes abajo (lista con miniatura, etiqueta y fecha; no grilla de todo) y búsqueda por etiqueta. Al completar 4 caracteres, si existe, abre la pantalla del código; si no, error claro + sugerencias.
+4. **Ver:** tocar un elemento en la pantalla del código: las fotos abren el visor propio con zoom (pinch/doble toque), deslizable solo entre las fotos; las notas, una vista de lectura; video, audio, PDF, archivos y links se abren directo con otra app (sin pantalla intermedia).
 5. **Compartir hacia la app:** `SEND` y `SEND_MULTIPLE` para `image/*`, `video/*`, `audio/*`, `application/pdf` y `text/plain` (links). Pantalla de destino: "Nuevo código" o "Agregar a un código existente".
 6. **Agregar desde la app:** Photo Picker (`PickMultipleVisualMedia`, sin permisos) y `OpenMultipleDocuments` para el resto; URL; nota de texto.
-7. **Borrar:** desde el detalle del código, con snackbar "Deshacer" (el borrado físico se difiere unos segundos).
+7. **Borrar:** en la pantalla del código, mantener presionado un elemento entra al modo selección (varios a la vez); el código entero, desde el menú ⋮. Siempre con snackbar "Deshacer" (el borrado físico se difiere unos segundos).
 8. **Onboarding:** una sola pantalla, sin pedir permisos. La cámara pide permiso recién al usarse.
 
 ## 7. Respaldo
@@ -137,7 +138,7 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 | 8 | El código se muestra solo si está guardado | Pantalla del código, vibración y código visible únicamente después del commit en la base. Desde el 27/10/2026, al cargar desde la galería o archivos el código se guarda vacío primero y sus elementos llegan en segundo plano (ver "Carga de fotos"). | 2 |
 | 9 | Ninguna foto perdida en ráfaga | Cada foto se persiste al sacarla; el `Link` se crea con la primera. Si el proceso muere, al volver se retoma la sesión con lo ya guardado. | 2 |
 | 10 | Compartir sin URIs vencidas | Copiar el archivo antes de soltar el intent recibido; si falla, avisar y no crear el vínculo. | 2 |
-| 11 | Recurso abierto evidente | El visor muestra arriba el código y la etiqueta, para que un código mal leído se note sin agregar demoras. La apertura sigue siendo instantánea al cuarto carácter. | 3 |
+| 11 | Recurso abierto evidente | La pantalla del código, el visor y la vista de nota muestran arriba el código y la etiqueta, para que un código mal leído se note sin agregar demoras. La apertura sigue siendo instantánea al cuarto carácter. | 3 |
 | 12 | Respaldo verificable | Subir primero los archivos y al final el manifest; verificar `sha256` al restaurar; un respaldo cortado nunca queda como "el último". | 4 |
 | 13 | Respaldo que no se cae en silencio | Mostrar fecha del último respaldo exitoso; aviso visible si pasaron más de 7 días o si se revocó el acceso a Drive. | 4 |
 | 14 | Restaurar sobre datos existentes | Fusión por id de attachment; si un código existe con otro contenido, se agregan los attachments faltantes y no se pisa nada. | 4 |
@@ -212,7 +213,7 @@ La app hace poco, así que eso poco tiene que ser impecable. Cada punto se imple
 - **Criterio:** con 200 vínculos de prueba, abrir por código en menos de 1 s desde arranque en frío; TalkBack puede ingresar un código.
 - **Verificación (23/10/2026, Pixel 8, API 37):** con 203 códigos (200 de prueba vía `SeedReceiver`), arranque en frío 0,64–0,70 s y del cuarto carácter al visor ~0,19 s. La migración 3→4 corrió sobre los datos reales del usuario sin perder nada. Probado en el teléfono: código inexistente con sugerencias ("36OF" sugiere 36TF), visor con zoom por doble toque, detalle, borrar y deshacer un elemento, borrar y deshacer un código. 33 unit tests y 54 instrumentados en verde. **Pendiente: verificación con TalkBack por parte del usuario** (ver "Estado actual").
 - **Notas y decisiones:**
-  - Al completar un código existente se abre directo el **visor** (deslizable por todos los elementos); el detalle se abre desde el visor. El visor muestra arriba código y etiqueta (garantía 11).
+  - ~~Al completar un código existente se abre directo el **visor** (deslizable por todos los elementos); el detalle se abre desde el visor.~~ Reemplazado el 27/10/2026 por la pantalla del código unificada (ver más abajo). El visor muestra arriba código y etiqueta (garantía 11).
   - Sugerencias (`domain/CodeSuggestions.kt`): códigos a un carácter de distancia; primero los pares confundibles a mano U/V, M/N, G/6, Q/9, T/7, A/4. Los caracteres fuera del alfabeto (O, 0, I, 1…) funcionan como comodín (hasta 2) y además muestran un aviso específico.
   - Borrar elementos sueltos: **primera migración real (v3 → v4)**, `attachments.deletedAt` con la misma ventana de deshacer y purga que los códigos. `@Relation` no filtra, así que el repositorio oculta los attachments borrados. `PaperLinkDatabase.VERSION` es la constante de versión que usan los tests. Se agregó `room-testing` y los esquemas se exponen como assets de `androidTest`.
   - Zoom con **telephoto** (`zoomable-image-coil3` 0.19.0): carga la imagen a resolución completa por partes al hacer zoom, clave para leer apuntes. Medido: agrega ~80 KB al APK de release (3,54 MB con, 3,46 MB sin).
@@ -293,6 +294,18 @@ Motivación: cargar 25 fotos de la galería se sentía muy lento. Medición en e
   - Si la cancelación llegaba antes del `try` del trabajo en segundo plano, la carga quedaba "en curso" para siempre. El orden al terminar (borrar la anotación antes que el estado) evita que la Home muestre un falso "carga cortada".
   - Si la cancelación llega justo cuando un archivo ya se escribió pero antes de devolverlo, queda un archivo sin fila: lo borra el barrido de huérfanos del próximo inicio.
 
+### Pantalla del código unificada (27/10/2026)
+
+- **Problema (detectado al usar la app):** editar un código (agregar, borrar elementos) estaba escondido detrás del ícono (i) del visor, que no comunica esa intención. Además, el mismo toque llevaba a tres interfaces distintas según el tipo de elemento (foto con zoom, nota como texto suelto, tarjeta con "Abrir con…").
+- **Decisión:** una sola pantalla del código (opción A de dos maquetas; la B era sumarle al visor una barra de acciones y una tira de miniaturas, y dejaba las tres interfaces). Fusiona el detalle y la pantalla tras crear (`ui/screens/code/`; se borró `ui/screens/detail/`):
+  - Código grande, etiqueta siempre editable (se guarda sola), grilla adaptable de miniaturas cuadradas: fotos, video (ícono de play), PDF (primera página + insignia), notas (extracto), links (dominio, o miniatura si es YouTube), audio/archivo (ícono, tipo y tamaño), archivo faltante (aviso en rojo).
+  - "Agregar" siempre visible. Mantener presionado → modo selección; se borran varios juntos con un solo "Deshacer". Borrar el código, en el menú ⋮.
+  - Recién creado (cámara, galería o compartir): vibra, muestra "Anotalo en tu cuaderno" y un botón "Listo". Si se llegó compartiendo, salir cierra la app.
+- **Al tocar:** foto → visor (solo fotos; se sacó la (i)); nota → vista propia de lectura (`ui/screens/note/`); PDF, video, audio, archivos y links → se abren directo con otra app o el navegador (el usuario pidió sacar la pantalla intermedia "Abrir con…"). Si no hay app o falta el archivo, snackbar.
+- **Bug encontrado al probar:** como la etiqueta ahora se guarda al salir, `LinkRepository.setLabel` actualizaba `updatedAt` aunque no cambiara: abrir un código y volver lo subía en recientes y disparaba una sincronización con Drive. Ahora no escribe si la etiqueta es la misma (test `setLabel_unchangedLabelDoesNotTouchUpdatedAt`).
+- **Medición de apertura:** el log de debug `Code shown` reemplaza a `Viewer shown` como fin de "abrir por código".
+- **Verificación (Pixel 8):** 82 instrumentados y unit tests en verde. Probado: abrir por código (25 fotos), visor en la foto tocada ("2 / 25"), nota, link (abre Chrome), PDF (selector de apps de Android), seleccionar, borrar y deshacer, compartir un link → código nuevo con aviso y "Listo", borrar el código desde ⋮; el orden de recientes no cambia al entrar y salir. **Falta:** crear con la cámara en vivo y TalkBack sobre la grilla.
+
 ## 10. Registro de decisiones
 
 | Fecha | Decisión | Motivo |
@@ -321,4 +334,5 @@ Motivación: cargar 25 fotos de la galería se sentía muy lento. Medición en e
 | 2026-10-27 | Si la app se cierra a mitad de una carga, avisar (no retomar sola) | Retomar pediría permisos persistentes y una cola; la ventana es de pocos segundos |
 | 2026-10-27 | Al cargar desde la galería o archivos, el código se crea vacío al instante y los elementos llegan en segundo plano | Poder anotar el código sin esperar; si nada se guarda, el código queda y se avisa (ajuste sobre la garantía 8) |
 | 2026-10-27 | Subida a Drive con `multipart` (≤ 5 MB) y 8 en paralelo sobre HTTP/2; respaldo en segundo plano (`DriveSyncWorker`) | 16 fotos de 124 KB bajan de 74,1 s a 3,8 s (19,5×); el cuello de botella era la latencia por archivo de Drive (~1,9 s RTT), no el Wi-Fi (`docs/informes/2026-10-27-respaldo-drive-velocidad-y-sincronizacion.md`) |
+| 2026-10-27 | Pantalla del código única para abrir y crear (grilla, "Agregar" visible, selección múltiple); archivos y links se abren directo; visor solo de fotos | La edición estaba escondida tras la (i) y el mismo toque llevaba a tres interfaces distintas; reemplaza "al completar un código se abre el visor directo" (2026-10-23) |
 | 2026-10-27 | Sincronización automática con Drive por Wi-Fi al agregar/editar contenido y al abrir la app | Subida transparente apenas hay Wi-Fi (`pendingSync` si no hay) y fusión automática de cambios hechos en otro dispositivo al abrir la app sin subir un manifest redundante |
