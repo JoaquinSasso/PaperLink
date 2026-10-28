@@ -1,6 +1,7 @@
 package com.joasasso.paperlink.ui.screens.home
 
 import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -113,6 +114,12 @@ fun HomeScreen(
     val focusManager = LocalFocusManager.current
     // El foco no sobrevive a la muerte del proceso, así que alcanza con remember.
     var searchFocused by remember { mutableStateOf(false) }
+
+    // Con una búsqueda activa, "atrás" la borra; sin búsqueda, sale de la app como siempre.
+    BackHandler(enabled = query.isNotEmpty()) {
+        viewModel.onQueryChange("")
+        focusManager.clearFocus()
+    }
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
     var confirmDeleteCode by rememberSaveable { mutableStateOf<String?>(null) }
