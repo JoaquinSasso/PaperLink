@@ -1,7 +1,9 @@
 package com.joasasso.paperlink.ui.screens.home
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -71,6 +74,8 @@ import com.joasasso.paperlink.ui.common.BackgroundImportCard
 import com.joasasso.paperlink.ui.common.InterruptedImportCard
 import com.joasasso.paperlink.ui.common.CodeInputField
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -100,6 +105,7 @@ fun HomeScreen(
     val interruptedImports by viewModel.interruptedImports.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
+    var confirmDeleteCode by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(events.open) {
         events.open?.let {
@@ -120,14 +126,21 @@ fun HomeScreen(
             viewModel.onMessageShown()
         }
     }
-    val deletedMessage = deletedCode?.let { stringResource(R.string.home_code_deleted, it) }
+    val activeDeletedCode = events.deleted ?: deletedCode
+    val deletedMessage = activeDeletedCode?.let { stringResource(R.string.home_code_deleted, it) }
     val undoLabel = stringResource(R.string.action_undo)
-    LaunchedEffect(deletedCode) {
-        if (deletedCode == null || deletedMessage == null) return@LaunchedEffect
+    LaunchedEffect(activeDeletedCode) {
+        if (activeDeletedCode == null || deletedMessage == null) return@LaunchedEffect
         // Se marca como atendido después de mostrarlo: hacerlo antes cambia la clave y cancela el snackbar.
-        val result = snackbar.showSnackbar(deletedMessage, actionLabel = undoLabel, duration = SnackbarDuration.Long)
-        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(deletedCode)
-        onDeletedCodeHandled(deletedCode)
+        val timeoutJob = launch {
+            delay(10_000L)
+            snackbar.currentSnackbarData?.dismiss()
+        }
+        val result = snackbar.showSnackbar(deletedMessage, actionLabel = undoLabel, duration = SnackbarDuration.Indefinite)
+        timeoutJob.cancel()
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(activeDeletedCode)
+        viewModel.onDeletedHandled(activeDeletedCode)
+        onDeletedCodeHandled(activeDeletedCode)
     }
 
     Scaffold(
@@ -248,10 +261,32 @@ fun HomeScreen(
                     }
                 }
                 else -> items(list, key = { it.link.code }) { item ->
-                    LinkRow(item, fileFor = viewModel::fileFor, onClick = { viewModel.open(item.link.code) })
+                    LinkRow(
+                        item = item,
+                        fileFor = viewModel::fileFor,
+                        onClick = { viewModel.open(item.link.code) },
+                        onLongClick = { confirmDeleteCode = item.link.code },
+                    )
                 }
             }
         }
+    }
+
+    confirmDeleteCode?.let { targetCode ->
+        AlertDialog(
+            onDismissRequest = { confirmDeleteCode = null },
+            title = { Text(stringResource(R.string.detail_delete_code_title, targetCode)) },
+            text = { Text(stringResource(R.string.detail_delete_code_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteCode = null
+                    viewModel.delete(targetCode)
+                }) { Text(stringResource(R.string.action_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteCode = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
     }
 
     AddContentSheet(
@@ -361,11 +396,13 @@ private fun NotFoundHint(lookup: HomeViewModel.Lookup.NotFound, onSuggestion: (S
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LinkRow(
     item: LinkWithAttachments,
     fileFor: (Attachment) -> File?,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val first = item.attachments.firstOrNull()
     val count = item.attachments.size
@@ -377,7 +414,11 @@ private fun LinkRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = stringResource(R.string.detail_delete_code),
+            )
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

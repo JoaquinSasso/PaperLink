@@ -23,6 +23,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -112,5 +114,22 @@ class HomeViewModelTest {
         vm.type("ACD")
 
         assertEquals(HomeViewModel.Lookup.Idle, vm.lookup.value)
+    }
+
+    @Test
+    fun deleteAndUndo_softDeletesAndRestoresCode() = runBlocking {
+        val code = repository.createLink(listOf(AttachmentSource.Note("x")))
+        val vm = viewModel()
+
+        withContext(Dispatchers.Main) { vm.delete(code) }
+        assertEquals(code, withTimeout(5_000) { vm.events.first { it.deleted != null } }.deleted)
+        assertNull(repository.getLink(code))
+
+        withContext(Dispatchers.Main) {
+            vm.undoDelete(code)
+            vm.onDeletedHandled(code)
+        }
+        assertNotNull(withTimeout(5_000) { repository.observeLink(code).first { it != null } })
+        assertNull(vm.events.value.deleted)
     }
 }

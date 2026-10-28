@@ -164,7 +164,7 @@
     <string name="home_code_not_found">El código %1$s no existe.</string>
     <string name="home_invalid_chars">Los códigos nunca usan O, 0, I, 1, Z, 2, S, 5, B ni 8. Revisá lo que escribiste.</string>
     <string name="home_did_you_mean">¿Quisiste decir?</string>
-    <string name="home_code_deleted">Código %1$s borrado</string>
+    <string name="home_code_deleted">Se eliminó el código %1$s y su contenido</string>
     <plurals name="home_row_details">
         <item quantity="one">%1$d elemento · %2$s</item>
         <item quantity="other">%1$d elementos · %2$s</item>

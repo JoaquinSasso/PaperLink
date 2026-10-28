@@ -75,6 +75,8 @@ class HomeViewModel(
         val open: String? = null,
         /** Código recién creado desde "Nuevo", para mostrar su pantalla. */
         val created: String? = null,
+        /** Código recién borrado desde la lista, para ofrecer "Deshacer". */
+        val deleted: String? = null,
         @StringRes val message: Int? = null,
     )
 
@@ -171,7 +173,22 @@ class HomeViewModel(
         )
     }
 
-    /** Deshacer el borrado de un código hecho desde su detalle. */
+    /** Borra un código desde la lista de Home. */
+    fun delete(code: String) {
+        viewModelScope.launch {
+            try {
+                repository.delete(code)
+                _events.update { it.copy(deleted = code) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Home delete failed", e)
+                _events.update { it.copy(message = e.messageRes()) }
+            }
+        }
+    }
+
+    /** Deshacer el borrado de un código. */
     fun undoDelete(code: String) {
         viewModelScope.launch {
             if (!repository.undoDelete(code)) _events.update { it.copy(message = R.string.undo_too_late) }
@@ -188,6 +205,8 @@ class HomeViewModel(
 
     fun onOpenHandled() = _events.update { it.copy(open = null) }
     fun onCreatedHandled() = _events.update { it.copy(created = null) }
+    fun onDeletedHandled(code: String) =
+        _events.update { if (it.deleted == code) it.copy(deleted = null) else it }
     fun onMessageShown() = _events.update { it.copy(message = null) }
 
     private fun lookUp(code: String, openIfFound: Boolean) {
