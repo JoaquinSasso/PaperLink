@@ -7,6 +7,7 @@ import com.joasasso.paperlink.TestDir
 import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.files.ImportException
 import com.joasasso.paperlink.data.local.Attachment.Kind
+import com.joasasso.paperlink.data.local.CodeLabel
 import com.joasasso.paperlink.data.local.PaperLinkDatabase
 import com.joasasso.paperlink.domain.CodeAlphabet
 import kotlinx.coroutines.CoroutineScope
@@ -374,6 +375,24 @@ class LinkRepositoryTest {
 
         assertEquals(listOf(physics), repo.searchByLabel("fisica").first().map { it.link.code })
         assertEquals(listOf(physics), repo.searchByLabel("  FÍSICA ").first().map { it.link.code })
+    }
+
+    @Test
+    fun observeLabels_newestFirstAndSkipsUnlabeledAndDeleted() = runBlocking {
+        val repo = repository()
+        val older = repo.createLink(listOf(AttachmentSource.Note("x")), label = "Física")
+        now += 1
+        repo.createLink(listOf(AttachmentSource.Note("x")))
+        now += 1
+        val deleted = repo.createLink(listOf(AttachmentSource.Note("x")), label = "Borrada")
+        now += 1
+        val newer = repo.createLink(listOf(AttachmentSource.Note("x")), label = "Química")
+        repo.delete(deleted)
+
+        assertEquals(
+            listOf(CodeLabel(newer, "Química"), CodeLabel(older, "Física")),
+            repo.observeLabels().first(),
+        )
     }
 
     @Test

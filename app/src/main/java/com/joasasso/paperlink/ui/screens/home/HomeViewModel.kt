@@ -19,6 +19,7 @@ import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkRepository
 import com.joasasso.paperlink.domain.CodeAlphabet
 import com.joasasso.paperlink.domain.suggestCodes
+import com.joasasso.paperlink.domain.suggestLabels
 import com.joasasso.paperlink.ui.common.ContentImporter
 import com.joasasso.paperlink.ui.common.messageRes
 import com.joasasso.paperlink.util.log
@@ -97,6 +98,11 @@ class HomeViewModel(
     val searchResults: StateFlow<List<LinkWithAttachments>?> = query
         .flatMapLatest { q -> if (q.isBlank()) flowOf(null) else repository.searchByLabel(q) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue = null)
+
+    /** Etiquetas ya usadas que coinciden con la búsqueda (la pantalla decide cuándo mostrarlas). */
+    val labelSuggestions: StateFlow<List<String>> = combine(query, repository.observeLabels()) { q, labels ->
+        suggestLabels(labels.map { it.label }, q)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val backupBanner: StateFlow<BackupBanner?> = if (preferences != null) {
         combine(preferences.backupSettings, repository.observeCount()) { settings, count ->

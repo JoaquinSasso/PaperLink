@@ -134,6 +134,10 @@ interface LinkDao {
     @Query("SELECT * FROM links WHERE deletedAt IS NULL AND label IS NOT NULL ORDER BY updatedAt DESC")
     fun observeLabeled(): Flow<List<LinkWithAttachments>>
 
+    /** Etiquetas en uso (para sugerirlas), de la más reciente a la más vieja. */
+    @Query("SELECT code, label FROM links WHERE deletedAt IS NULL AND label IS NOT NULL ORDER BY updatedAt DESC")
+    fun observeLabels(): Flow<List<CodeLabel>>
+
     // --- Elementos sueltos ---
 
     @Query("UPDATE attachments SET deletedAt = :now WHERE id = :id AND deletedAt IS NULL")

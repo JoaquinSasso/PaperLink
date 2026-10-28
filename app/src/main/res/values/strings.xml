@@ -168,6 +168,7 @@
     <string name="home_new_code">New</string>
     <string name="home_search_label">Search by label</string>
     <string name="home_search_clear">Clear search</string>
+    <string name="label_suggestions">Labels you already used</string>
     <string name="home_recent">Recent</string>
     <string name="home_results">Results</string>
     <string name="home_empty">No codes yet. Tap New or use the PaperLink camera widget.</string>

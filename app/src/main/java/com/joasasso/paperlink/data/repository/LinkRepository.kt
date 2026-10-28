@@ -9,6 +9,7 @@ import com.joasasso.paperlink.data.backup.MergeCounts
 import com.joasasso.paperlink.data.backup.toBackup
 import com.joasasso.paperlink.data.files.AttachmentStore
 import com.joasasso.paperlink.data.local.Attachment
+import com.joasasso.paperlink.data.local.CodeLabel
 import com.joasasso.paperlink.data.local.Link
 import com.joasasso.paperlink.data.local.LinkDao
 import com.joasasso.paperlink.data.local.LinkWithAttachments
@@ -84,6 +85,9 @@ class LinkRepository(
         dao.observeLabeled().map { list ->
             list.filter { labelMatches(it.link.label, query) }.map { it.visible() }
         }
+
+    /** Etiquetas de los códigos vigentes, de la más reciente a la más vieja (para sugerirlas). */
+    fun observeLabels(): Flow<List<CodeLabel>> = dao.observeLabels()
 
     /** Todos los códigos vigentes (para sugerir parecidos cuando uno no existe). */
     suspend fun allCodes(): List<String> = dao.allCodes()

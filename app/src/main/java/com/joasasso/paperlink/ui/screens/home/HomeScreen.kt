@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,11 +56,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,6 +78,7 @@ import com.joasasso.paperlink.ui.common.AttachmentThumbnail
 import com.joasasso.paperlink.ui.common.BackgroundImportCard
 import com.joasasso.paperlink.ui.common.InterruptedImportCard
 import com.joasasso.paperlink.ui.common.CodeInputField
+import com.joasasso.paperlink.ui.common.LabelSuggestionRow
 import com.joasasso.paperlink.ui.theme.JetBrainsMono
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -103,6 +109,10 @@ fun HomeScreen(
     val backupBanner by viewModel.backupBanner.collectAsStateWithLifecycle()
     val backgroundImports by viewModel.backgroundImports.collectAsStateWithLifecycle()
     val interruptedImports by viewModel.interruptedImports.collectAsStateWithLifecycle()
+    val labelSuggestions by viewModel.labelSuggestions.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
+    // El foco no sobrevive a la muerte del proceso, así que alcanza con remember.
+    var searchFocused by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
     var confirmDeleteCode by rememberSaveable { mutableStateOf<String?>(null) }
@@ -201,8 +211,20 @@ fun HomeScreen(
                             }
                         } else null,
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                        modifier = Modifier.fillMaxWidth().onFocusChanged { searchFocused = it.isFocused },
                     )
+                    if (searchFocused || query.isNotEmpty()) {
+                        LabelSuggestionRow(
+                            labels = labelSuggestions,
+                            onPick = { label ->
+                                viewModel.onQueryChange(label)
+                                focusManager.clearFocus()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
             items(backgroundImports, key = { "import-${it.code}" }) { status ->

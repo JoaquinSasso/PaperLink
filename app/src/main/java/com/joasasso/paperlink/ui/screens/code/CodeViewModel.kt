@@ -17,6 +17,7 @@ import com.joasasso.paperlink.data.repository.AttachmentSource
 import com.joasasso.paperlink.data.repository.BatchImporter
 import com.joasasso.paperlink.data.repository.LinkContent
 import com.joasasso.paperlink.data.repository.LinkRepository
+import com.joasasso.paperlink.domain.suggestLabels
 import com.joasasso.paperlink.ui.common.ContentImporter
 import com.joasasso.paperlink.ui.common.messageRes
 import com.joasasso.paperlink.ui.navigation.CodeDestination
@@ -28,6 +29,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -79,6 +82,17 @@ class CodeViewModel(
     )
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
+    /**
+     * Etiquetas de otros códigos que coinciden con lo escrito. La de este código se excluye: se
+     * guarda con demora mientras se escribe y aparecería como sugerencia de sí misma.
+     */
+    val labelSuggestions: StateFlow<List<String>> = combine(
+        _ui.map { it.label }.distinctUntilChanged(),
+        repository.observeLabels(),
+    ) { label, labels ->
+        suggestLabels(labels.filter { it.code != code }.map { it.label }, label)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val importer = ContentImporter(viewModelScope, batchImporter)
 
     /** Carga en segundo plano de este código (por ejemplo, el resto de las fotos elegidas). */
@@ -121,6 +135,13 @@ class CodeViewModel(
             delay(LABEL_SAVE_DELAY_MS)
             run { repository.setLabel(code, label) }
         }
+    }
+
+    /** Eligió una etiqueta sugerida: se guarda enseguida. */
+    fun onLabelPicked(label: String) {
+        handle[KEY_LABEL] = label
+        _ui.update { it.copy(label = label) }
+        saveLabel()
     }
 
     /** Guarda la etiqueta ya (sin esperar) y después ejecuta [then]. */

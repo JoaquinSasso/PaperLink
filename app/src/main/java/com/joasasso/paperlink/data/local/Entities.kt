@@ -24,6 +24,9 @@ data class Link(
     val deletedAt: Long?,
 )
 
+/** Etiqueta de un código, sin el resto de la fila (para sugerir etiquetas ya usadas). */
+data class CodeLabel(val code: String, val label: String)
+
 /**
  * Un recurso vinculado a un código.
  *

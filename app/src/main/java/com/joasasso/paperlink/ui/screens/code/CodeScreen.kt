@@ -70,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -94,6 +95,7 @@ import com.joasasso.paperlink.data.local.Attachment.Kind
 import com.joasasso.paperlink.ui.common.AddContentSheet
 import com.joasasso.paperlink.ui.common.AttachmentThumbnail
 import com.joasasso.paperlink.ui.common.BackgroundImportCard
+import com.joasasso.paperlink.ui.common.LabelSuggestionRow
 import com.joasasso.paperlink.ui.common.icon
 import com.joasasso.paperlink.ui.common.labelRes
 import com.joasasso.paperlink.ui.common.openWebLink
@@ -124,6 +126,7 @@ fun CodeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val backgroundImport by viewModel.backgroundImport.collectAsStateWithLifecycle()
+    val labelSuggestions by viewModel.labelSuggestions.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val haptics = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -257,7 +260,9 @@ fun CodeScreen(
                             code = viewModel.code,
                             justCreated = viewModel.justCreated,
                             label = ui.label,
+                            labelSuggestions = labelSuggestions,
                             onLabelChange = viewModel::onLabelChange,
+                            onLabelPicked = viewModel::onLabelPicked,
                             onLabelDone = { viewModel.saveLabel() },
                         )
                     }
@@ -352,10 +357,14 @@ private fun Header(
     code: String,
     justCreated: Boolean,
     label: String,
+    labelSuggestions: List<String>,
     onLabelChange: (String) -> Unit,
+    onLabelPicked: (String) -> Unit,
     onLabelDone: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
+    // El foco no sobrevive a la muerte del proceso, así que alcanza con remember.
+    var labelFocused by remember { mutableStateOf(false) }
     val spoken = stringResource(R.string.code_spoken, code.toList().joinToString(" "))
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -392,8 +401,18 @@ private fun Header(
                 focusManager.clearFocus()
                 onLabelDone()
             }),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { labelFocused = it.isFocused },
         )
+        if (labelFocused) {
+            LabelSuggestionRow(
+                labels = labelSuggestions,
+                onPick = { picked ->
+                    focusManager.clearFocus()
+                    onLabelPicked(picked)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

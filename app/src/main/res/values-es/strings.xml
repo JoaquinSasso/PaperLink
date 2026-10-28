@@ -168,6 +168,7 @@
     <string name="home_new_code">Nuevo</string>
     <string name="home_search_label">Buscar por etiqueta</string>
     <string name="home_search_clear">Borrar búsqueda</string>
+    <string name="label_suggestions">Etiquetas que ya usaste</string>
     <string name="home_recent">Recientes</string>
     <string name="home_results">Resultados</string>
     <string name="home_empty">Todavía no hay códigos. Tocá Nuevo o usá el widget de cámara de PaperLink.</string>
