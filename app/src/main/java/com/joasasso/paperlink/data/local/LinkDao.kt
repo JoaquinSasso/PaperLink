@@ -54,6 +54,17 @@ interface LinkDao {
     @Query("SELECT COALESCE(MAX(position), -1) FROM attachments WHERE linkCode = :code")
     suspend fun maxPosition(code: String): Int
 
+    @Query("UPDATE attachments SET text = :text WHERE id = :id AND deletedAt IS NULL")
+    suspend fun updateAttachmentText(id: String, text: String): Int
+
+    /** Cambia el texto de una nota y marca su código como modificado. @return false si ya no existe. */
+    @Transaction
+    suspend fun updateNoteText(code: String, id: String, text: String, now: Long): Boolean {
+        if (updateAttachmentText(id, text) == 0) return false
+        touch(code, now)
+        return true
+    }
+
     @Query("UPDATE links SET label = :label, updatedAt = :now WHERE code = :code AND deletedAt IS NULL")
     suspend fun updateLabel(code: String, label: String?, now: Long): Int
 

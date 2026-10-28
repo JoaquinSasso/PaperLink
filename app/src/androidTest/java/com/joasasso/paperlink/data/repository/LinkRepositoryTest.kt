@@ -243,6 +243,27 @@ class LinkRepositoryTest {
         assertEquals(now, repo.getLink(code)!!.link.updatedAt)
     }
 
+    @Test
+    fun updateNote_changesTextAndSkipsUnchanged() = runBlocking {
+        val repo = repository()
+        val code = repo.createLink(listOf(AttachmentSource.Note("Antes"), AttachmentSource.WebUrl("https://example.com")))
+        val (note, url) = repo.getLink(code)!!.attachments
+        val before = repo.getLink(code)!!.link.updatedAt
+
+        now += 60_000
+        assertTrue(repo.updateNote(note.id, "Antes"))
+        assertEquals(before, repo.getLink(code)!!.link.updatedAt)
+
+        assertTrue(repo.updateNote(note.id, "Después"))
+        assertEquals("Después", repo.getLink(code)!!.attachments.first { it.id == note.id }.text)
+        assertEquals(now, repo.getLink(code)!!.link.updatedAt)
+
+        // Solo notas, y no las borradas.
+        assertFalse(repo.updateNote(url.id, "x"))
+        repo.deleteAttachment(note.id)
+        assertFalse(repo.updateNote(note.id, "Otra"))
+    }
+
     // --- Búsqueda y recientes ---
 
     @Test

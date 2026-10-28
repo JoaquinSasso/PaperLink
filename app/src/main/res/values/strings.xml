@@ -186,6 +186,9 @@
     <string name="viewer_no_photos">This code has no photos.</string>
     <string name="viewer_no_app">No app on this phone can open this.</string>
 
+    <!-- Nota -->
+    <string name="note_blank_not_saved">An empty note is not saved. To remove it, delete it from the code.</string>
+
     <!-- Fase 4: Respaldo -->
     <string name="backup_title">Backup</string>
     <string name="backup_drive_title">Google Drive</string>

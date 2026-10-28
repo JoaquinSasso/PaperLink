@@ -186,6 +186,9 @@
     <string name="viewer_no_photos">Este código no tiene fotos.</string>
     <string name="viewer_no_app">Ninguna app de este teléfono puede abrir esto.</string>
 
+    <!-- Nota -->
+    <string name="note_blank_not_saved">Una nota vacía no se guarda. Para quitarla, borrala desde el código.</string>
+
     <!-- Fase 4: Respaldo -->
     <string name="backup_title">Respaldo</string>
     <string name="backup_drive_title">Google Drive</string>

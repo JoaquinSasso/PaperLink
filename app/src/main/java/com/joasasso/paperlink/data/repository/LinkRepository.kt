@@ -183,6 +183,19 @@ class LinkRepository(
         }
     }
 
+    /**
+     * Cambia el texto de una nota; si no cambió no escribe nada.
+     * @return false si la nota ya no existe (por ejemplo, se borró).
+     */
+    suspend fun updateNote(id: String, text: String): Boolean {
+        require(text.isNotBlank()) { "A note cannot be blank" }
+        val note = dao.getRawAttachment(id)?.takeIf { it.deletedAt == null && it.kind == Attachment.Kind.NOTE } ?: return false
+        if (note.text == text) return true
+        if (!dao.updateNoteText(note.linkCode, id, text, clock())) return false
+        onChanged()
+        return true
+    }
+
     /** Si la etiqueta no cambió no escribe nada: así abrir y cerrar un código no lo sube en recientes. */
     suspend fun setLabel(code: String, label: String?) {
         val normalized = CodeAlphabet.normalize(code)
