@@ -99,16 +99,27 @@
     </plurals>
 
     <!-- Pantalla del código -->
-    <string name="code_title">Tu código</string>
     <string name="code_spoken">Código %1$s</string>
     <string name="code_hint">Anotalo en tu cuaderno. Después ingresalo para abrir lo que guardaste.</string>
     <string name="code_label_hint">Etiqueta (opcional)</string>
-    <string name="code_add_more">Agregar más</string>
+    <string name="code_add">Agregar</string>
     <string name="code_done">Listo</string>
-    <plurals name="code_attachment_count">
-        <item quantity="one">%d elemento guardado</item>
-        <item quantity="other">%d elementos guardados</item>
+    <string name="code_empty">Todavía no hay nada guardado. Tocá Agregar para guardar fotos, archivos, links o notas.</string>
+    <string name="code_more_options">Más opciones</string>
+    <string name="code_clear_selection">Cancelar selección</string>
+    <string name="code_delete_selected">Borrar seleccionados</string>
+    <string name="code_select_action">Seleccionar</string>
+    <plurals name="code_selected_count">
+        <item quantity="one">%d seleccionado</item>
+        <item quantity="other">%d seleccionados</item>
     </plurals>
+    <plurals name="code_items_deleted">
+        <item quantity="one">Se borró %d elemento</item>
+        <item quantity="other">Se borraron %d elementos</item>
+    </plurals>
+    <string name="code_delete">Borrar código</string>
+    <string name="code_delete_title">¿Borrar el código %1$s?</string>
+    <string name="code_delete_text">Se borra todo lo guardado en él. Vas a poder deshacerlo por unos segundos.</string>
 
     <!-- Compartir -->
     <string name="share_title">Guardar en PaperLink</string>
@@ -171,19 +182,9 @@
     </plurals>
 
     <!-- Visor -->
-    <string name="viewer_detail">Detalle</string>
-    <string name="viewer_empty">Este código no tiene nada guardado.</string>
     <string name="viewer_position">%1$d / %2$d</string>
-    <string name="viewer_open_link">Abrir link</string>
-    <string name="viewer_open_with">Abrir con…</string>
+    <string name="viewer_no_photos">Este código no tiene fotos.</string>
     <string name="viewer_no_app">Ninguna app de este teléfono puede abrir esto.</string>
-
-    <!-- Detalle -->
-    <string name="detail_delete_code">Borrar código</string>
-    <string name="detail_delete_code_title">¿Borrar el código %1$s?</string>
-    <string name="detail_delete_code_text">Se borra todo lo guardado en él. Vas a poder deshacerlo por unos segundos.</string>
-    <string name="detail_delete_item">Borrar elemento</string>
-    <string name="detail_item_deleted">Elemento borrado</string>
 
     <!-- Fase 4: Respaldo -->
     <string name="backup_title">Respaldo</string>

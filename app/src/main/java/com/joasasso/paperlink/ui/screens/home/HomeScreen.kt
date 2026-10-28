@@ -275,8 +275,8 @@ fun HomeScreen(
     confirmDeleteCode?.let { targetCode ->
         AlertDialog(
             onDismissRequest = { confirmDeleteCode = null },
-            title = { Text(stringResource(R.string.detail_delete_code_title, targetCode)) },
-            text = { Text(stringResource(R.string.detail_delete_code_text)) },
+            title = { Text(stringResource(R.string.code_delete_title, targetCode)) },
+            text = { Text(stringResource(R.string.code_delete_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDeleteCode = null
@@ -417,7 +417,7 @@ private fun LinkRow(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                onLongClickLabel = stringResource(R.string.detail_delete_code),
+                onLongClickLabel = stringResource(R.string.code_delete),
             )
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,

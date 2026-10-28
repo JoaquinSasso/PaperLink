@@ -99,16 +99,27 @@
     </plurals>
 
     <!-- Pantalla del código -->
-    <string name="code_title">Your code</string>
     <string name="code_spoken">Code %1$s</string>
     <string name="code_hint">Write it down in your notebook. Enter it later to open what you saved.</string>
     <string name="code_label_hint">Label (optional)</string>
-    <string name="code_add_more">Add more</string>
+    <string name="code_add">Add</string>
     <string name="code_done">Done</string>
-    <plurals name="code_attachment_count">
-        <item quantity="one">%d item saved</item>
-        <item quantity="other">%d items saved</item>
+    <string name="code_empty">Nothing saved yet. Tap Add to save photos, files, links, or notes.</string>
+    <string name="code_more_options">More options</string>
+    <string name="code_clear_selection">Cancel selection</string>
+    <string name="code_delete_selected">Delete selected</string>
+    <string name="code_select_action">Select</string>
+    <plurals name="code_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
     </plurals>
+    <plurals name="code_items_deleted">
+        <item quantity="one">%d item deleted</item>
+        <item quantity="other">%d items deleted</item>
+    </plurals>
+    <string name="code_delete">Delete code</string>
+    <string name="code_delete_title">Delete code %1$s?</string>
+    <string name="code_delete_text">Everything saved in it will be deleted. You can undo it for a few seconds.</string>
 
     <!-- Compartir -->
     <string name="share_title">Save to PaperLink</string>
@@ -171,19 +182,9 @@
     </plurals>
 
     <!-- Visor -->
-    <string name="viewer_detail">Details</string>
-    <string name="viewer_empty">This code has nothing saved.</string>
     <string name="viewer_position">%1$d / %2$d</string>
-    <string name="viewer_open_link">Open link</string>
-    <string name="viewer_open_with">Open with…</string>
+    <string name="viewer_no_photos">This code has no photos.</string>
     <string name="viewer_no_app">No app on this phone can open this.</string>
-
-    <!-- Detalle -->
-    <string name="detail_delete_code">Delete code</string>
-    <string name="detail_delete_code_title">Delete code %1$s?</string>
-    <string name="detail_delete_code_text">Everything saved in it will be deleted. You can undo it for a few seconds.</string>
-    <string name="detail_delete_item">Delete item</string>
-    <string name="detail_item_deleted">Item deleted</string>
 
     <!-- Fase 4: Respaldo -->
     <string name="backup_title">Backup</string>

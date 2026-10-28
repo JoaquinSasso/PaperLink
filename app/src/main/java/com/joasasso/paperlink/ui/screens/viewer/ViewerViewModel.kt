@@ -1,6 +1,5 @@
 package com.joasasso.paperlink.ui.screens.viewer
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
@@ -19,7 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.io.File
 
-/** Visor de los elementos de un código, deslizables. La página actual la guarda el pager. */
+/** Visor de las fotos de un código, deslizables. La página actual la guarda el pager. */
 class ViewerViewModel(
     val code: String,
     val startId: String?,
@@ -37,8 +36,6 @@ class ViewerViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), State.Loading)
 
     fun fileFor(attachment: Attachment): File? = repository.fileFor(attachment)
-
-    fun uriFor(attachment: Attachment): Uri? = repository.uriFor(attachment)
 
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {

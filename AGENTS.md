@@ -60,7 +60,7 @@ Todo trabajo de **corrección, refactorización u optimización** que siga este 
 - `data/backup/` — respaldo: `ZipBackupManager` (export/import manual), `DriveBackupManager` (incremental en `appDataFolder`; **nunca achica lo que hay en Drive**: si Drive tiene un respaldo que este teléfono no fusionó se niega a respaldar, y no borra en Drive archivos que una fila local todavía referencia), `DriveAppDataClient` (REST, subida reanudable), `DriveAuthManager`, `DriveBackupWorker` (diario). La fusión al restaurar es `LinkDao.mergeBackup` (por id, solo agrega).
 - `domain/` — funciones puras con unit tests: `CodeAlphabet` (26 caracteres, generación, validación), `CodeSuggestions`, `SearchText`, `WebLinks`.
 - `di/AppContainer.kt` — DI manual y `applicationScope` (trabajo que sobrevive a las pantallas).
-- `ui/navigation/NavGraph.kt` — rutas tipadas: Home, Onboarding, Camera, Code (tras crear), Share, Viewer, Detail, Backup. `MainActivity` traduce intents (compartir, acción `CAPTURE` del widget/atajo) a rutas.
+- `ui/navigation/NavGraph.kt` — rutas tipadas: Home, Onboarding, Camera, Code (pantalla única de un código: se abre al ingresarlo y al crearlo), Share, Viewer (solo fotos), Note, Backup. `MainActivity` traduce intents (compartir, acción `CAPTURE` del widget/atajo) a rutas.
 - `ui/screens/*` — una carpeta por pantalla (Screen + ViewModel con `Factory`). `ui/common/` — piezas compartidas: `CodeInputField`, `AddContentSheet`, `ContentImporter` (progreso y cancelar), `AttachmentThumbnail`, `messageRes()`.
 - `util/` — `log()`, `PdfDecoder` (miniaturas de PDF para Coil), `YouTubeUtils`. `widget/` — widget que abre la cámara.
 - `app/src/debug/` — `SeedReceiver` (carga/borra códigos de prueba; solo debug).
@@ -84,7 +84,7 @@ adb logcat -s PaperLink
   `adb shell am broadcast -a com.joasasso.paperlink.debug.DRIVE_BENCH --ei count 20 --ei sizeKb 300 -p com.joasasso.paperlink.debug`
 - Muerte del proceso: mandá la app a segundo plano (`input keyevent KEYCODE_HOME`), `am kill` o `run-as com.joasasso.paperlink.debug kill -9 <pid>`, y reabrí desde el launcher.
 - `adb shell input text` inyecta teclas más rápido que una persona y Gboard pierde caracteres: para probar el campo de código, enviá de a una tecla con ~150 ms de pausa.
-- Los logs de debug `Lookup started` / `Viewer shown` sirven para medir la apertura por código.
+- Los logs de debug `Lookup started` / `Code shown` sirven para medir la apertura por código.
 
 ## Pruebas en dispositivo
 
