@@ -228,6 +228,21 @@ class LinkRepositoryTest {
         }
     }
 
+    @Test
+    fun setLabel_unchangedLabelDoesNotTouchUpdatedAt() = runBlocking {
+        val repo = repository()
+        val code = repo.createLink(listOf(AttachmentSource.Note("x")))
+        repo.setLabel(code, "Álgebra")
+        val before = repo.getLink(code)!!.link.updatedAt
+
+        now += 60_000
+        repo.setLabel(code, "  Álgebra ")
+        assertEquals(before, repo.getLink(code)!!.link.updatedAt)
+
+        repo.setLabel(code, "Física")
+        assertEquals(now, repo.getLink(code)!!.link.updatedAt)
+    }
+
     // --- Búsqueda y recientes ---
 
     @Test

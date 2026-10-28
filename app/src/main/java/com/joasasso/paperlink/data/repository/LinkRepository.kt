@@ -183,9 +183,13 @@ class LinkRepository(
         }
     }
 
+    /** Si la etiqueta no cambió no escribe nada: así abrir y cerrar un código no lo sube en recientes. */
     suspend fun setLabel(code: String, label: String?) {
         val normalized = CodeAlphabet.normalize(code)
-        if (dao.updateLabel(normalized, label.normalizeLabel(), clock()) == 0) throw LinkNotFoundException(normalized)
+        val newLabel = label.normalizeLabel()
+        val current = dao.getRawLink(normalized)?.takeIf { it.deletedAt == null } ?: throw LinkNotFoundException(normalized)
+        if (current.label == newLabel) return
+        if (dao.updateLabel(normalized, newLabel, clock()) == 0) throw LinkNotFoundException(normalized)
         onChanged()
     }
 
